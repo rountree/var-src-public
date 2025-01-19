@@ -15,34 +15,6 @@
 #include "msr_utils.h"
 
 
-static uint16_t max_msrsafe_cpu = UINT16_MAX;   // current limitation of msr-safe.
-
-//////////////////////////////////////////////////////////////////////////////////
-// List of MSRs
-//////////////////////////////////////////////////////////////////////////////////
-
-static constexpr const uint32_t PERF_STATUS             = 0x0198;
-static constexpr const uint32_t THERM_STATUS            = 0x019C;  // 22:16 Degrees C away from max
-
-static constexpr const uint32_t PKG_ENERGY_STATUS       = 0x0611;
-
-static constexpr const uint32_t PERF_GLOBAL_CTRL        = 0x038F;
-static constexpr const uint32_t FIXED_CTR_CTRL          = 0x038D;
-static constexpr const uint32_t FIXED_CTR0              = 0x0309;   // INST_RETIRED.ANY
-static constexpr const uint32_t FIXED_CTR1              = 0x030A;   // CPU_CLK_UNHALTED.[THREAD|CORE]
-static constexpr const uint32_t FIXED_CTR2              = 0x030B;   // CPU_CLK_UNHALTED.REF_TSC
-
-static const char * const msr2str[] = {
-    [PERF_STATUS]       = "PERF_STATUS",
-    [THERM_STATUS]      = "THERM_STATUS",
-    [PKG_ENERGY_STATUS] = "PKG_ENERGY_STATUS",
-    [PERF_GLOBAL_CTRL]  = "PERF_GLOBAL_CTRL",
-    [FIXED_CTR_CTRL]    = "FIXED_CTR_CTRL",
-    [FIXED_CTR0]        = "FIXED_CTR0",
-    [FIXED_CTR1]        = "FIXED_CTR1",
-    [FIXED_CTR2]        = "FIXED_CTR2"
-};
-
 static const char * const op2str[] = {
     [OP_WRITE]          = "WRITE",
     [OP_READ]           = "READ",
@@ -56,20 +28,143 @@ static const char * const op2str[] = {
     [OP_THERM_FINAL]    = "THERM_FINAL"
 };
 
-//////////////////////////////////////////////////////////////////////////////////
-// Allowlist.  Order by most-used to least-used.
-//////////////////////////////////////////////////////////////////////////////////
+static uint16_t max_msrsafe_cpu = UINT16_MAX;   // current limitation of msr-safe.
 
-static char const *const allowlist = "0x0611 0x0000000000000000\n"      // PKG_ENERGY_STATUS
+//////////////////////////////////////////////////////////////////////////////////
+// List of MSRs
+//////////////////////////////////////////////////////////////////////////////////
+static constexpr const uint32_t  TIME_STAMP_COUNTER               = 0x0010;
+static constexpr const uint32_t  MISC_PACKAGE_CTLS                = 0x00BC;
+static constexpr const uint32_t  MPERF                            = 0x00E7;
+static constexpr const uint32_t  APERF                            = 0x00E8;
+static constexpr const uint32_t  ARCH_CAPABILTIES                 = 0x010A;
+static constexpr const uint32_t  PERF_STATUS                      = 0x0198;
+static constexpr const uint32_t  PERF_CTL                         = 0x0199;
+static constexpr const uint32_t  THERM_STATUS                     = 0x019C; // 22:16 Degrees C away from max
+static constexpr const uint32_t  ENERGY_PERF_BIAS                 = 0x01B0;
+static constexpr const uint32_t  PACKAGE_THERM_STATUS             = 0x01B1; // 22:16 Degrees C away from max
+static constexpr const uint32_t  FIXED_CTR0                       = 0x0309; // INST_RETIRED.ANY
+static constexpr const uint32_t  FIXED_CTR1                       = 0x030A; // CPU_CLK_UNHALTED.[THREAD|CORE]
+static constexpr const uint32_t  FIXED_CTR2                       = 0x030B; // CPU_CLK_UNHALTED.REF_TSC
+static constexpr const uint32_t  FIXED_CTR3                       = 0x030C;
+static constexpr const uint32_t  FIXED_CTR_CTRL                   = 0x038D;
+static constexpr const uint32_t  PERF_GLOBAL_CTRL                 = 0x038F;
+static constexpr const uint32_t  RAPL_POWER_UNIT                  = 0x0606;
+static constexpr const uint32_t  PKG_POWER_LIMIT                  = 0x0610;
+static constexpr const uint32_t  PKG_ENERGY_STATUS                = 0x0611;
+static constexpr const uint32_t  PACKAGE_ENERGY_TIME_STATUS       = 0x0612;
+static constexpr const uint32_t  PKG_PERF_STATUS                  = 0x0613;
+static constexpr const uint32_t  PKG_POWER_INFO                   = 0x0614;
+static constexpr const uint32_t  DRAM_PWER_LIMIT                  = 0x0618;
+static constexpr const uint32_t  DRAM_ENERGY_STATUS               = 0x0619;
+static constexpr const uint32_t  DRAM_PERF_STATUS                 = 0x061B;
+static constexpr const uint32_t  DRAM_POWER_INFO                  = 0x061C;
+static constexpr const uint32_t  PP0_POWER_LIMIT                  = 0x0638;
+static constexpr const uint32_t  PP0_ENERGY_STATUS                = 0x0639;
+static constexpr const uint32_t  PP0_POLICY                       = 0x063A;
+static constexpr const uint32_t  PP1_POWER_LIMIT                  = 0x0640;
+static constexpr const uint32_t  PP1_ENERGY_STATUS                = 0x0641;
+static constexpr const uint32_t  PP1_POLICY                       = 0x0642;
+static constexpr const uint32_t  PLATFORM_ENERGY_COUNTER          = 0x064D;
+static constexpr const uint32_t  PPERF                            = 0x064E;
+static constexpr const uint32_t  PLATFORM_POWER_INFO              = 0x0665;
+static constexpr const uint32_t  PLATFORM_POWER_LIMIT             = 0x065C;
+static constexpr const uint32_t  PLATFORM_RAPL_SOCKET_PERF_STATUS = 0x0666;
+static constexpr const uint32_t  PM_ENABLE                        = 0x0770;
+static constexpr const uint32_t  HWP_CAPABILITIES                 = 0x0771;
+
+// This wastes an extravagant amount of memory if the compiler isn't optimizing
+// based on the double const.  Use constexpr?
+static const char * const msr2str[] = {
+       [TIME_STAMP_COUNTER]                = "TIME_STAMP_COUNTER",
+       [MISC_PACKAGE_CTLS]                 = "MISC_PACKAGE_CTLS",
+       [MPERF]                             = "MPERF",
+       [APERF]                             = "APERF",
+       [ARCH_CAPABILTIES]                  = "ARCH_CAPABILTIES",
+       [PERF_STATUS]                       = "PERF_STATUS",
+       [PERF_CTL]                          = "PERF_CTL",
+       [THERM_STATUS]                      = "THERM_STATUS",
+       [ENERGY_PERF_BIAS]                  = "ENERGY_PERF_BIAS",
+       [PACKAGE_THERM_STATUS]              = "PACKAGE_THERM_STATUS",
+       [FIXED_CTR0]                        = "FIXED_CTR0",
+       [FIXED_CTR1]                        = "FIXED_CTR1",
+       [FIXED_CTR2]                        = "FIXED_CTR2",
+       [FIXED_CTR3]                        = "FIXED_CTR3",
+       [FIXED_CTR_CTRL]                    = "FIXED_CTR_CTRL",
+       [PERF_GLOBAL_CTRL]                  = "PERF_GLOBAL_CTRL",
+       [RAPL_POWER_UNIT]                   = "RAPL_POWER_UNIT",
+       [PKG_POWER_LIMIT]                   = "PKG_POWER_LIMIT",
+       [PKG_ENERGY_STATUS]                 = "PKG_ENERGY_STATUS",
+       [PACKAGE_ENERGY_TIME_STATUS]        = "PACKAGE_ENERGY_TIME_STATUS",
+       [PKG_PERF_STATUS]                   = "PKG_PERF_STATUS",
+       [PKG_POWER_INFO]                    = "PKG_POWER_INFO",
+       [DRAM_PWER_LIMIT]                   = "DRAM_PWER_LIMIT",
+       [DRAM_ENERGY_STATUS]                = "DRAM_ENERGY_STATUS",
+       [DRAM_PERF_STATUS]                  = "DRAM_PERF_STATUS",
+       [DRAM_POWER_INFO]                   = "DRAM_POWER_INFO",
+       [PP0_POWER_LIMIT]                   = "PP0_POWER_LIMIT",
+       [PP0_ENERGY_STATUS]                 = "PP0_ENERGY_STATUS",
+       [PP0_POLICY]                        = "PP0_POLICY",
+       [PP1_POWER_LIMIT]                   = "PP1_POWER_LIMIT",
+       [PP1_ENERGY_STATUS]                 = "PP1_ENERGY_STATUS",
+       [PP1_POLICY]                        = "PP1_POLICY",
+       [PLATFORM_ENERGY_COUNTER]           = "PLATFORM_ENERGY_COUNTER",
+       [PPERF]                             = "PPERF",
+       [PLATFORM_POWER_INFO]               = "PLATFORM_POWER_INFO",
+       [PLATFORM_POWER_LIMIT]              = "PLATFORM_POWER_LIMIT",
+       [PLATFORM_RAPL_SOCKET_PERF_STATUS]  = "PLATFORM_RAPL_SOCKET_PERF_STATUS",
+       [PM_ENABLE]                         = "PM_ENABLE",
+       [HWP_CAPABILITIES]                  = "HWP_CAPABILITIES",
+};
+
+
+//////////////////////////////////////////////////////////////////////////////////
+// Allowlist.
+//////////////////////////////////////////////////////////////////////////////////
+static char const *const allowlist =
+                                    // Polling MSRs (TBD)
+
+                                    // Everything else
+                                     "0x0010 0x0000000000000000\n"      // TIME_STAMP_COUNTER
+                                     "0x00BC 0x0000000000000000\n"      // MISC_PACKAGE_CTLS
+                                     "0x00E7 0x0000000000000000\n"      // MPERF
+                                     "0x00E8 0x0000000000000000\n"      // APERF
+                                     "0x010A 0x0000000000000000\n"      // ARCH_CAPABILTIES
                                      "0x0198 0x0000000000000000\n"      // PERF_STATUS
+                                     "0x0199 0x0000000000000000\n"      // PERF_CTL
                                      "0x019C 0x0000000000000000\n"      // THERM_STATUS
                                      "0x0010 0x0000000000000000\n"      // TIME_STAMP_COUNTER
+                                     "0x01B0 0x0000000000000000\n"      // ENERGY_PERF_BIAS
+                                     "0x01B1 0x0000000000000000\n"      // PACKAGE_THERM_STATUS
                                      "0x0309 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR0
                                      "0x030A 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR1
                                      "0x030B 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR2
                                      "0x030C 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR3
                                      "0x038D 0x0000000000000333\n"      // FIXED_CTR_CTRL
                                      "0x038F 0x0000000700000000\n"      // PERF_GLOBAL_CTRL
+                                     "0x0606 0x0000000000000000\n"      // RAPL_POWER_UNIT
+                                     "0x0610 0x0000000000000000\n"      // PKG_POWER_LIMIT
+                                     "0x0611 0x0000000000000000\n"      // PKG_ENERGY_STATUS
+                                     "0x0612 0x0000000000000000\n"      // PACKAGE_ENERGY_TIME_STATUS
+                                     "0x0613 0x0000000000000000\n"      // PKG_PERF_STATUS
+                                     "0x0614 0x0000000000000000\n"      // PKG_POWER_INFO
+                                     "0x0618 0x0000000000000000\n"      // DRAM_PWER_LIMIT
+                                     "0x0619 0x0000000000000000\n"      // DRAM_ENERGY_STATUS
+                                     "0x061B 0x0000000000000000\n"      // DRAM_PERF_STATUS
+                                     "0x061C 0x0000000000000000\n"      // DRAM_POWER_INFO
+                                     "0x0638 0x0000000000000000\n"      // PP0_POWER_LIMIT
+                                     "0x0639 0x0000000000000000\n"      // PP0_ENERGY_STATUS
+                                     "0x063A 0x0000000000000000\n"      // PP0_POLICY
+                                     "0x0640 0x0000000000000000\n"      // PP1_POWER_LIMIT
+                                     "0x0641 0x0000000000000000\n"      // PP1_ENERGY_STATUS
+                                     "0x0642 0x0000000000000000\n"      // PP1_POLICY
+                                     "0x064D 0x0000000000000000\n"      // PLATFORM_ENERGY_COUNTER
+                                     "0x064E 0x0000000000000000\n"      // PPERF
+                                     "0x0665 0x0000000000000000\n"      // PLATFORM_POWER_INFO
+                                     "0x065C 0x0000000000000000\n"      // PLATFORM_POWER_LIMIT
+                                     "0x0666 0x0000000000000000\n"      // PLATFORM_RAPL_SOCKET_PERF_STATUS
+                                     "0x0770 0x0000000000000000\n"      // PM_ENABLE
+                                     "0x0771 0x0000000000000000\n"      // HWP_CAPABILITIES
                                      ;
 
 static constexpr const uint32_t MAX_POLL_ATTEMPTS = 10000;
@@ -98,6 +193,7 @@ static constexpr const struct msr_batch_op op_stop_global  = { .op = OP_WRITE | 
 static constexpr const struct msr_batch_op op_poll_pkg_J = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = PKG_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
 static constexpr const struct msr_batch_op op_poll_pkg_F = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = PERF_STATUS,       .poll_max=MAX_POLL_ATTEMPTS };
 static constexpr const struct msr_batch_op op_poll_pkg_C = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = THERM_STATUS,      .poll_max=MAX_POLL_ATTEMPTS };
+
 
 void teardown_msrsafe_batches( struct job *job ){
 
@@ -161,7 +257,7 @@ void setup_msrsafe_batches( struct job *job ){
 
     // Map the longitudinal batches
     // It's possible to stuff everything into a single batch, but it's easier to reason
-    // about multiple batches, each doing one thing on multiple CPUs.
+    // about multiple batches, each doing one op on multiple CPUs.
     for( size_t i = 0; i < job->longitudinal_count; i++ ){
 
         uint32_t ncpu = CPU_COUNT( &(job->longitudinals[i]->sample_cpus) );
