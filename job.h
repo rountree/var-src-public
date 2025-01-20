@@ -20,16 +20,24 @@ typedef enum{
 
 typedef enum{
     FIXED_FUNCTION_COUNTERS,
+    NUM_LONGITUDINAL_FUNCTIONS,
 } longitudinal_t;
 
 typedef enum{
+    // For longitudinal recipes like fixed function performance counters, we want
+    // the start and stop triggers to occur more-or-less simultaneously on all CPUs,
+    // and we want those simultaneous events to happen more-or-less simultaneous
+    // with the start of benchmarks and polling.  Thus, break out START and STOP
+    // so they contain only the msr writes necessary for starting and stopping,
+    // and put the other bookkeeping in SETUP and READ/TEARDOWN.  The latter might
+    // become a single slot.
     SETUP,
     START,
     STOP,
     READ,
     TEARDOWN,
-    NUM_LONGITUDINAL_BATCH_TYPES
-} longitudinal_batch_t;
+    NUM_LONGITUDINAL_EXECUTION_SLOTS
+} longitudinal_slot_t;
 
 
 static const char * const polltype2str[] = {"POWER", "THERMAL", "FREQUENCY"};
@@ -62,15 +70,17 @@ struct benchmark_config{
 struct longitudinal_config{
     // Indexing here gets a little.... aggressive.
     // for( i = 0; i < job->longitudinal_count; i++ ){
-    //   for( j = 0; j < NUM_LONGITUDINAL_BATCH_TYPES; j++ ){
+    //   for( j = 0; j < NUM_LONGITUDINAL_EXECUTION_SLOTS; j++ ){
     //     for( k = 0; k < longitudinal_batch_count_per_type[ j ] ){
     //       for( o = 0; o < jobs->longitudinals[i]->longitudinal_batches[j][k].numops; o++ ){
     //         job->longitudinals[i]->longitudinal_batches[j][k].ops[o].cpu = cpu_idx;
     longitudinal_t              longitudinal_type;
     cpu_set_t                   sample_cpus;
 
-    size_t                      longitudinal_batch_count_per_type[ NUM_LONGITUDINAL_BATCH_TYPES ];
-    struct msr_batch_array*     longitudinal_batches             [ NUM_LONGITUDINAL_BATCH_TYPES ];
+    size_t                      longitudinal_batch_count_per_type[ NUM_LONGITUDINAL_EXECUTION_SLOTS ];
+    //struct msr_batch_array*     longitudinal_batches             [ NUM_LONGITUDINAL_EXECUTION_SLOTS ];
+
+    struct msr_batch_array*     qqq                              [ NUM_LONGITUDINAL_EXECUTION_SLOTS ];
 
 };
 
