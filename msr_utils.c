@@ -14,7 +14,6 @@
 #include "cpuset_utils.h"   // get_next_cpu()
 #include "msr_utils.h"
 
-
 static const char * const op2str[] = {
     [OP_WRITE]          = "WRITE",
     [OP_READ]           = "READ",
@@ -133,7 +132,6 @@ static char const *const allowlist =
                                      "0x0198 0x0000000000000000\n"      // PERF_STATUS
                                      "0x0199 0x0000000000000000\n"      // PERF_CTL
                                      "0x019C 0x0000000000000000\n"      // THERM_STATUS
-                                     "0x0010 0x0000000000000000\n"      // TIME_STAMP_COUNTER
                                      "0x01B0 0x0000000000000000\n"      // ENERGY_PERF_BIAS
                                      "0x01B1 0x0000000000000000\n"      // PACKAGE_THERM_STATUS
                                      "0x0309 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR0
@@ -236,11 +234,11 @@ void teardown_msrsafe_batches( struct job *job ){
     // Longitudinals are a little tricker.
     for( size_t i = 0; i < job->longitudinal_count; i++ ){
         for( longitudinal_slot_t slot_idx = 0; slot_idx < NUM_LONGITUDINAL_EXECUTION_SLOTS; slot_idx++ ){
-            if( NULL == job->longitudinals[i]->qqq[slot_idx] ){
+            if( NULL == job->longitudinals[i]->batches[slot_idx] ){
                 continue;
             }
-            free( job->longitudinals[i]->qqq[slot_idx]->ops );
-            free( job->longitudinals[i]->qqq[slot_idx] );
+            free( job->longitudinals[i]->batches[slot_idx]->ops );
+            free( job->longitudinals[i]->batches[slot_idx] );
         }
     }
 }
@@ -290,111 +288,63 @@ static void setup_polling_batches( struct job *job ){
 }
 
 static void setup_longitudinal_batches( struct job *job ){
-    // Map the longitudinal batches
-    // It's possible to stuff everything into a single batch, but it's easier to reason
-    // about multiple batches, each doing one op on multiple CPUs.
+
+    // Map the longitudinal functions we're using onto msr-safe batches.
+
+    static bool initialized;
+    static size_t ops_per_function_per_slot[ NUM_LONGITUDINAL_FUNCTIONS ][ NUM_LONGITUDINAL_EXECUTION_SLOTS ];
+
+    if( !initialized ){
+        // This is stupid, but it's better than hard-coding ops per function:slot tuple.
+        // But not that much better.  (The compiler has enough information to figure this out.
+        // It just doesn't yet.)
+        for( longitudinal_t lng_idx = 0; lng_idx < NUM_LONGITUDINAL_FUNCTIONS; lng_idx++ ){
+            for( longitudinal_slot_t slot_idx = 0; slot_idx < NUM_LONGITUDINAL_EXECUTION_SLOTS; slot_idx++ ){
+                const struct msr_batch_op * const *p = longitudinal_recipes[ lng_idx ][ slot_idx ];
+                while( *p++ ){
+                    ops_per_function_per_slot[ lng_idx ][ slot_idx ]++;
+                }
+            }
+        }
+        initialized = true;
+    }
+
     for( size_t i = 0; i < job->longitudinal_count; i++ ){
 
         uint32_t ncpu = CPU_COUNT( &(job->longitudinals[i]->sample_cpus) );
 
-        /* alternate implementation */
         // Local variables for terseness.
         struct longitudinal_config *lng = job->longitudinals[i];
 
-        for( int slot_idx = 0; slot_idx < NUM_LONGITUDINAL_EXECUTION_SLOTS; slot_idx++ ){
+        for( longitudinal_slot_t slot_idx = 0; slot_idx < NUM_LONGITUDINAL_EXECUTION_SLOTS; slot_idx++ ){
 
             // How many operations are in each slot of this longitudinal function?
-            uint32_t ops_per_cpu =                      // -1 as there's a terminatng NULL we don't want to count.
-                (  sizeof(longitudinal_recipes[ lng->longitudinal_type ][ slot_idx ]) / sizeof( struct msr_batch_op* )  ) - 1;
+            uint32_t ops_per_cpu = ops_per_function_per_slot[ lng->longitudinal_type ][ slot_idx ];
 
             if( 0 == ops_per_cpu ){
-                lng->qqq[ slot_idx ] = NULL;
+                lng->batches[ slot_idx ] = NULL;
                 continue;
             }
             uint32_t total_ops = ncpu * ops_per_cpu;
 
             // Allocate the msr_batch_array struct and populate it.
-            lng->qqq[ slot_idx ]            = calloc( 1, sizeof( struct msr_batch_array ) );
-            lng->qqq[ slot_idx ]->numops    = total_ops;
-            lng->qqq[ slot_idx ]->version   = MSR_SAFE_VERSION_u32;
-            lng->qqq[ slot_idx ]->ops       = calloc( total_ops, sizeof( struct msr_batch_op ) );
+            lng->batches[ slot_idx ]            = calloc( 1, sizeof( struct msr_batch_array ) );
+            lng->batches[ slot_idx ]->numops    = total_ops;
+            lng->batches[ slot_idx ]->version   = MSR_SAFE_VERSION_u32;
+            lng->batches[ slot_idx ]->ops       = calloc( total_ops, sizeof( struct msr_batch_op ) );
             // Make copies of the operations listed in longitudinal_recipes[ functions ][ slots ][ ops ]
             for( uint32_t op_idx = 0; op_idx < ops_per_cpu; op_idx++ ){
                 for ( uint32_t cpu_idx = 0, current_cpu = 0; cpu_idx < ncpu; cpu_idx++ ){
-                    memcpy( &(lng->qqq[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ]),
+                    memcpy( &(lng->batches[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ]),
                             longitudinal_recipes[ lng->longitudinal_type ][ slot_idx ][ op_idx ],
                             sizeof( struct msr_batch_op ) );
-                    lng->qqq[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ].err = 0xDECAFBAD;
+                    lng->batches[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ].err = 0xDECAFBAD;
                     current_cpu = get_next_cpu( current_cpu, max_msrsafe_cpu, &(lng->sample_cpus) );
-                    lng->qqq[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ].cpu = current_cpu;
+                    lng->batches[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ].cpu = current_cpu;
                     current_cpu++;
                 }
             }
         }
-        /* end alternate implementation */
-#if 0
-        if( FIXED_FUNCTION_COUNTERS == job->longitudinals[i]->longitudinal_type ){
-            job->longitudinals[i]->longitudinal_batch_count_per_type[0] = 5;// 5 batches for SETUP  ( global stop, zero x3, local enable ).
-            job->longitudinals[i]->longitudinal_batch_count_per_type[1] = 1;// 1 batch   for START  ( global start ).
-            job->longitudinals[i]->longitudinal_batch_count_per_type[2] = 1;// 1 batch   for STOP   ( global stop  ).
-            job->longitudinals[i]->longitudinal_batch_count_per_type[3] = 3;// 3 batches for READ   ( read x3 ).
-            job->longitudinals[i]->longitudinal_batch_count_per_type[4] = 0;// 0 batches for TEARDOWN
-
-            for( longitudinal_slot_t j = 0; j < NUM_LONGITUDINAL_EXECUTION_SLOTS; j++ ){
-
-                job->longitudinals[i]->longitudinal_batches[j] =
-                    calloc( job->longitudinals[i]->longitudinal_batch_count_per_type[j], sizeof( struct msr_batch_array ) );
-                assert( job->longitudinals[i]->longitudinal_batches[j] );
-                for( size_t k = 0; k < job->longitudinals[i]->longitudinal_batch_count_per_type[j]; k++ ){
-                    job->longitudinals[i]->longitudinal_batches[j][k].numops = ncpu;
-                    job->longitudinals[i]->longitudinal_batches[j][k].version = MSR_SAFE_VERSION_u32;
-                    job->longitudinals[i]->longitudinal_batches[j][k].ops =
-                        calloc( ncpu, sizeof( struct msr_batch_op ) );
-                    assert( job->longitudinals[i]->longitudinal_batches[j][k].ops );
-
-                    // Figure out which op we need.
-                    const struct msr_batch_op *op;
-                    switch( j ){
-                        case SETUP:{
-                                       switch( k ){
-                                           case 0:  op = &op_stop_global;       break;
-                                           case 1:  op = &op_zero_fixed_ctr0;   break;
-                                           case 2:  op = &op_zero_fixed_ctr1;   break;
-                                           case 3:  op = &op_zero_fixed_ctr2;   break;
-                                           case 4:  op = &op_enable_fixed;      break;
-                                           default: assert(0);                  break;
-                                       }
-                                       break;
-                                   }
-                        case START:                 op = &op_start_global;      break;
-                        case STOP:                  op = &op_stop_global;       break;
-                        case READ:{
-                                      switch( k ){
-                                          case 0:   op = &op_read_fixed_ctr0;   break;
-                                          case 1:   op = &op_read_fixed_ctr1;   break;
-                                          case 2:   op = &op_read_fixed_ctr2;   break;
-                                          default:  assert(0);                  break;
-                                      }
-                                      break;
-                                  }
-                        default: assert(0); break;
-                    };
-
-                    uint16_t cpu_idx = 0;
-                    for( size_t c = 0; c < ncpu; c++ ){
-                        memcpy( &(job->longitudinals[i]->longitudinal_batches[j][k].ops[c]), op, sizeof( struct msr_batch_op ) );
-                        cpu_idx = get_next_cpu( cpu_idx, max_msrsafe_cpu, &(job->longitudinals[i]->sample_cpus) );
-                        job->longitudinals[i]->longitudinal_batches[j][k].ops[c].cpu = cpu_idx;
-                        job->longitudinals[i]->longitudinal_batches[j][k].ops[c].err = (int32_t)(0xDECAFBAD);
-                        cpu_idx++;
-                    }
-                } // end k-loop over longitudinal_batch_count_per_type[j]
-            } // end j-loop over NUM_LONGITUDINAL_EXECUTION_SLOTS
-
-        }else{
-            assert(0); // no other longitudinal tasks types to chooose from.
-        }
-#endif
     }
 }
 
@@ -408,7 +358,15 @@ void populate_allowlist( void ) {
     int fd = open("/dev/cpu/msr_allowlist", O_WRONLY);
     assert(-1 != fd);
     ssize_t nbytes = write(fd, allowlist, strlen(allowlist));
-    assert(strlen(allowlist) == nbytes);
+    if( -1 == nbytes ){
+        fprintf( stderr, "%s:%d:%s Loading allowlist failed:  (%d) %s.\n",
+                __FILE__, __LINE__, __func__, errno, strerror( errno ) );
+        exit(-1);
+    }
+    if( nbytes != strlen(allowlist) ){
+        fprintf( stderr, "%zd bytes written to /dev/cpu/msr_allowlist, expected to write %zu.\n", nbytes, strlen(allowlist) );
+        exit(-1);
+    }
     close(fd);
 }
 
@@ -480,18 +438,20 @@ void dump_batches( struct job *job ){
     print_header();
 
     // longitudinals
+    printf( "# Dumping longitudinal batches\n");
     for( size_t i = 0; i < job->longitudinal_count; i++ ){
-        for( size_t slot_idx = 0; slot_idx < NUM_LONGITUDINAL_EXECUTION_SLOTS; slot_idx++ ){
-            if( NULL == job->longitudinals[i]->qqq[ slot_idx ] ){
+        for( longitudinal_slot_t slot_idx = 0; slot_idx < NUM_LONGITUDINAL_EXECUTION_SLOTS; slot_idx++ ){
+            if( NULL == job->longitudinals[i]->batches[ slot_idx ] ){
                 continue;
             }
-            for( size_t op_idx = 0; op_idx < job->longitudinals[i]->qqq[slot_idx]->numops; op_idx++ ){
-                print_op( &( job->longitudinals[i]->qqq[slot_idx]->ops[op_idx] ) );
+            for( size_t op_idx = 0; op_idx < job->longitudinals[i]->batches[slot_idx]->numops; op_idx++ ){
+                print_op( &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ) );
             }
         }
     }
 
     // polls
+    printf( "# Dumping poll batches\n");
     for( size_t i = 0; i < job->poll_count; i++ ){
         for( size_t o = 0; o < job->polls[i]->total_ops; o++ ){
             print_op( &(job->polls[i]->poll_ops[o]) );
@@ -510,13 +470,18 @@ void run_longitudinal_batches( struct job *job, longitudinal_slot_t slot_idx ){
     }
 
     for( size_t i = 0; i < job->longitudinal_count; i++ ){
-        if( NULL == job->longitudinals[i]->qqq[slot_idx] ){
+        if( NULL == job->longitudinals[i]->batches[slot_idx] ){
             continue;
         }
         errno = 0;
-        int rc = ioctl( fd, X86_IOC_MSR_BATCH, &(job->longitudinals[i]->qqq[slot_idx] ) );
+        int rc = ioctl( fd, X86_IOC_MSR_BATCH, job->longitudinals[i]->batches[slot_idx] );
         if( 0 != rc ){
-            perror("ioctl failed for longitudinal batch.");
+            fprintf( stderr, "%s:%d:%s ioctl failed with code (%d):  %s.\n"
+                             "         longitudinal batch type = %d.\n"
+                             "         slot = %d.\n",
+                    __FILE__, __LINE__, __func__, errno, strerror( errno ),
+                    job->longitudinals[i]->longitudinal_type,
+                    slot_idx);
             exit(-1);
         }
     }

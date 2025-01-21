@@ -68,19 +68,13 @@ struct benchmark_config{
 };
 
 struct longitudinal_config{
-    // Indexing here gets a little.... aggressive.
-    // for( i = 0; i < job->longitudinal_count; i++ ){
-    //   for( j = 0; j < NUM_LONGITUDINAL_EXECUTION_SLOTS; j++ ){
-    //     for( k = 0; k < longitudinal_batch_count_per_type[ j ] ){
-    //       for( o = 0; o < jobs->longitudinals[i]->longitudinal_batches[j][k].numops; o++ ){
-    //         job->longitudinals[i]->longitudinal_batches[j][k].ops[o].cpu = cpu_idx;
     longitudinal_t              longitudinal_type;
     cpu_set_t                   sample_cpus;
 
     size_t                      longitudinal_batch_count_per_type[ NUM_LONGITUDINAL_EXECUTION_SLOTS ];
     //struct msr_batch_array*     longitudinal_batches             [ NUM_LONGITUDINAL_EXECUTION_SLOTS ];
 
-    struct msr_batch_array*     qqq                              [ NUM_LONGITUDINAL_EXECUTION_SLOTS ];
+    struct msr_batch_array*     batches                              [ NUM_LONGITUDINAL_EXECUTION_SLOTS ];
 
 };
 
