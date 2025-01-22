@@ -24,7 +24,7 @@ static void print_help( void ){
     printf( "  -s / --seconds=<duration> (Default is 10 seconds)\n");
     printf( "\n");
     printf( "  -m / --main=<main_cpu>\n");
-    printf( "  -b / --benchmark=<benchmark_type>:<execution_cpus>:<benchmark_param1>:<benchmark_param2\n");
+    printf( "  -b / --benchmark=<benchmark_type>:<execution_cpus>:<benchmark_param1>:<benchmark_param2>\n");
     printf( "  -l / --longitudinal=<longitudinal_type>:<sample_cpus>\n");
     printf( "  -p / --poll=<poll_type>:<control_cpu>:<sample_cpu>\n");
     printf( "\n");
