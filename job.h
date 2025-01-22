@@ -20,6 +20,7 @@ typedef enum{
 
 typedef enum{
     FIXED_FUNCTION_COUNTERS,
+    ENERGY_COUNTERS,
     NUM_LONGITUDINAL_FUNCTIONS,
 } longitudinal_t;
 
@@ -42,7 +43,7 @@ typedef enum{
 
 static const char * const polltype2str[] = {"POWER", "THERMAL", "FREQUENCY"};
 static const char * const benchmarktype2str[] = {"SLEEP", "SPIN", "XRSTOR"};
-static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS"};
+static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS", "ENERGY_COUNTERS"};
 
 struct poll_config{
     poll_t                      poll_type;

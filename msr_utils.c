@@ -188,15 +188,27 @@ static constexpr const struct msr_batch_op op_enable_fixed = { .op = OP_WRITE | 
 static constexpr const struct msr_batch_op op_start_global = { .op = OP_WRITE | OP_TSC_INITIAL, .msr = PERF_GLOBAL_CTRL, .msrdata=0x700000000 };
 static constexpr const struct msr_batch_op op_stop_global  = { .op = OP_WRITE | OP_TSC_INITIAL, .msr = PERF_GLOBAL_CTRL, .msrdata=0x000000000 };
 
+// Polling instructions.  C and F need some attention.
 static constexpr const struct msr_batch_op op_poll_pkg_J = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = PKG_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
 static constexpr const struct msr_batch_op op_poll_pkg_F = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = PERF_STATUS,       .poll_max=MAX_POLL_ATTEMPTS };
 static constexpr const struct msr_batch_op op_poll_pkg_C = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = THERM_STATUS,      .poll_max=MAX_POLL_ATTEMPTS };
 
+// Single-read energy instructions.
+static constexpr const struct msr_batch_op op_rd_RAPL_POWER_UNIT         = { .op = OP_READ | OP_TSC_INITIAL, .msr = RAPL_POWER_UNIT };
+static constexpr const struct msr_batch_op op_rd_PKG_ENERGY_STATUS       = { .op = OP_READ | OP_TSC_INITIAL, .msr = PKG_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_DRAM_ENERGY_STATUS      = { .op = OP_READ | OP_TSC_INITIAL, .msr = DRAM_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_PP0_ENERGY_STATUS       = { .op = OP_READ | OP_TSC_INITIAL, .msr = PP0_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_PP1_ENERGY_STATUS       = { .op = OP_READ | OP_TSC_INITIAL, .msr = PP1_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_PLATFORM_ENERGY_COUNTER = { .op = OP_READ | OP_TSC_INITIAL, .msr = PLATFORM_ENERGY_COUNTER };
 
 //////////////////////////////////////////////////////////////////////////////////
 // Working around C initialization limitations
+//
+// These must be NULL-terminated.
+//
 //////////////////////////////////////////////////////////////////////////////////
 
+// FIXED_FUNCTION_COUNTERS
 static const struct msr_batch_op * const fixed_function_counters__setup[] = {
     &op_stop_global, &op_zero_fixed_ctr0, &op_zero_fixed_ctr1, &op_zero_fixed_ctr2, &op_enable_fixed, NULL };
 static const struct msr_batch_op * const fixed_function_counters__start[] = {
@@ -208,15 +220,31 @@ static const struct msr_batch_op * const fixed_function_counters__read[] = {
 static const struct msr_batch_op * const fixed_function_counters__teardown[] = {
     NULL };
 
-static const struct msr_batch_op * const * const fixed_function_counters__ops[NUM_LONGITUDINAL_EXECUTION_SLOTS] = {
+// ENERGY_COUNTERS
+static const struct msr_batch_op * const energy_counters__setup[] = { &op_rd_RAPL_POWER_UNIT, NULL };
+static const struct msr_batch_op * const energy_counters__start[] = {
+    &op_rd_PKG_ENERGY_STATUS, &op_rd_DRAM_ENERGY_STATUS, &op_rd_PP0_ENERGY_STATUS, &op_rd_PP1_ENERGY_STATUS, &op_rd_PLATFORM_ENERGY_COUNTER, NULL };
+static const struct msr_batch_op * const energy_counters__stop[] = {
+    &op_rd_PKG_ENERGY_STATUS, &op_rd_DRAM_ENERGY_STATUS, &op_rd_PP0_ENERGY_STATUS, &op_rd_PP1_ENERGY_STATUS, &op_rd_PLATFORM_ENERGY_COUNTER, NULL };
+static const struct msr_batch_op * const energy_counters__read[] = { NULL };
+static const struct msr_batch_op * const energy_counters__teardown[] = { NULL };
+
+static const struct msr_batch_op * const * const fixed_function_counters__ops[ NUM_LONGITUDINAL_EXECUTION_SLOTS ] = {
     fixed_function_counters__setup,
     fixed_function_counters__start,
     fixed_function_counters__stop,
     fixed_function_counters__read,
     fixed_function_counters__teardown };
 
+static const struct msr_batch_op * const * const energy_counters__ops[ NUM_LONGITUDINAL_EXECUTION_SLOTS ] = {
+    energy_counters__setup,
+    energy_counters__start,
+    energy_counters__stop,
+    energy_counters__read,
+    energy_counters__teardown };
+
 static const struct msr_batch_op * const * const * const longitudinal_recipes[ NUM_LONGITUDINAL_FUNCTIONS ] = {
-    fixed_function_counters__ops };
+    fixed_function_counters__ops, energy_counters__ops };
 
 
 //////////////////////////////////////////////////////////////////////////////////

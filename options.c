@@ -37,11 +37,16 @@ static void print_help( void ){
     printf( "  loop around the Intel Intrinsics _mm256_zeroall() and _xrstor64().\n");
     printf( "  The loop executes until <duration> seconds have expired.\n");
     printf( "\n");
-    printf( "The only Valid <longitudinal_type> is FIXED_FUNCTION_COUNTERS.\n");
-    printf( "  The counter accumulators for instructions retired, reference\n");
-    printf( "  cycles, and cycle counts will be zeroed out before the start\n");
-    printf( "  of the benchmark(s) and read out after <duration> seconds\n");
-    printf( "  elapse.\n");
+    printf( "The two valid <longitudinal_type>s are FIXED_FUNCTION_COUNTERS\n");
+    printf( "  and ENERGY_COUNTERS.  With regard to the former:\n");
+    printf( "    The counter accumulators for instructions retired, reference\n");
+    printf( "    cycles, and cycle counts will be zeroed out before the start\n");
+    printf( "    of the benchmark(s) and read out after <duration> seconds\n");
+    printf( "    elapse.\n");
+    printf( "  With regard to the latter:\n");
+    printf( "    All possible counters are read, but only a subset will be present\n");
+    printf( "    on any particular processor.  Check the error field for whether or\n");
+    printf( "    not a reading is meaningful.  All values are package-scope.\n");
     printf( "\n");
     printf( "Valid <poll_types> are POWER, THERMAL, and FREQUENCY.  The model-\n");
     printf( "  specific registers responsible for each are expected to be updated\n");
@@ -272,6 +277,8 @@ void parse_options( int argc, char **argv, struct job *job ){
                 // Fill in the struct
                 if( 0 == strcmp( longitudinaltype2str[0], lng_type ) ){
                     lng->longitudinal_type = FIXED_FUNCTION_COUNTERS;
+                }else if ( 0 == strcmp( longitudinaltype2str[1], lng_type ) ){
+                    lng->longitudinal_type = ENERGY_COUNTERS;
                 }else{
                     printf( "%s:%d:%s Unknown longitudinal type (%s).\n",
                             __FILE__, __LINE__, __func__, lng_type );
