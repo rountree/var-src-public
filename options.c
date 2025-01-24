@@ -3,7 +3,7 @@
 #include <getopt.h>             // getopt_long(3)
 #include <stdlib.h>             // calloc(3), malloc(3)
 #include <stdio.h>              // printf(3)
-#include <string.h>             // strtok_r(3)
+#include <string.h>             // strtok_r(3), strdup(3)
 #include <stdint.h>
 #include <inttypes.h>
 #include "job.h"
@@ -89,7 +89,7 @@ static void print_parameters( struct job *job ){
         printf("# benchmark %zu of %zu:  type=%s. parameters=%#"PRIx64", %#"PRIx64".\n",
                 i, job->benchmark_count, benchmarktype2str[ job->benchmarks[i]->benchmark_type ],
                 job->benchmarks[i]->benchmark_param1, job->benchmarks[i]->benchmark_param2 );
-        printf("#          execution cpus:  ");
+        printf("#          execution cpu id(s):  ");
         print_cpuset( &job->benchmarks[i]->execution_cpus );
     }
 
@@ -291,24 +291,8 @@ void parse_options( int argc, char **argv, struct job *job ){
              }
             case 'b':   // benchmark
             {
-                // Increment the number of benchmark tasks.
-                job->benchmark_count++;
-
-                // Increase the size of the array of benchmark pointers
-                job->benchmarks = realloc(
-                        job->benchmarks,
-                        sizeof( struct benchmark_config *) * job->benchmark_count );
-                assert( job->benchmarks );
-
-                // Allocate a benchmark_config struct
-                struct benchmark_config *bch = calloc( 1, sizeof( struct benchmark_config ) );
-                assert( bch );
-                job->benchmarks[ job->benchmark_count - 1 ] = bch;
-
                 // Parse optarg
-                char *local_optarg = malloc( strlen(optarg) + 1 );
-                assert( local_optarg );
-                strcpy( local_optarg, optarg );
+                char *local_optarg = strdup( optarg );
                 char *saveptr = NULL;
                 char *bch_type   = strtok_r( local_optarg, ":", &saveptr );
                 char *bch_cpuset = strtok_r( NULL, ":", &saveptr );
@@ -336,17 +320,52 @@ void parse_options( int argc, char **argv, struct job *job ){
                     exit(-1);
                 }
 
-                // Fill in the struct
-                if( 0 == strcmp( benchmarktype2str[XRSTOR], bch_type ) ){
-                    bch->benchmark_type = XRSTOR;
-                }else{
-                    printf( "%s:%d:%s Unknown benchmark type (%s).\n",
-                            __FILE__, __LINE__, __func__, bch_type );
-                    exit(-1);
+                // Unlike longitudinal tasks, we need one benchmark_config per thread.
+                cpu_set_t all_cpus;
+                str2cpuset( bch_cpuset, &all_cpus );
+                size_t num_threads = get_cpuset_count( &all_cpus );
+
+                unsigned int current_cpu = 0;
+                size_t first_new_benchmark_idx = job->benchmark_count;
+                job->benchmark_count += num_threads;
+
+                // Increase the size of the array of benchmark pointers
+                job->benchmarks = realloc(
+                        job->benchmarks,
+                        sizeof( struct benchmark_config *) * job->benchmark_count );
+                assert( job->benchmarks );
+
+                // Grab the parameters
+                uint64_t benchmark_param1 = safe_strtoull( bch_param1 );
+                uint64_t benchmark_param2 = safe_strtoull( bch_param2 );
+
+                // Allocate and fill in the structs.
+                for( size_t bch_idx = first_new_benchmark_idx; bch_idx < job->benchmark_count; bch_idx++ ){
+
+                    // Allocation
+                    job->benchmarks[ bch_idx ] = calloc( 1, sizeof( struct benchmark_config ) );
+                    assert( job->benchmarks[ bch_idx ] );
+
+                    // Benchmark type
+                    if( 0 == strcmp( benchmarktype2str[XRSTOR], bch_type ) ){
+                        job->benchmarks[ bch_idx ]->benchmark_type = XRSTOR;
+                    }else{
+                        printf( "%s:%d:%s Unknown benchmark type (%s).\n",
+                                __FILE__, __LINE__, __func__, bch_type );
+                        exit(-1);
+                    }
+
+                    // cpu
+                    current_cpu = get_next_cpu( current_cpu, 255, &all_cpus );
+                    cpu2cpuset( current_cpu++, &(job->benchmarks[ bch_idx ]->execution_cpus) );
+                    printf("Added cpu %d to benchmark idx %zu.\n", current_cpu, bch_idx );
+
+                    // Parameters
+                    job->benchmarks[ bch_idx ]->benchmark_param1 = benchmark_param1;
+                    job->benchmarks[ bch_idx ]->benchmark_param2 = benchmark_param2;
+
                 }
-                str2cpuset( bch_cpuset, &bch->execution_cpus );
-                bch->benchmark_param1 = safe_strtoull( bch_param1 );
-                bch->benchmark_param2 = safe_strtoull( bch_param2 );
+
                 free(local_optarg);
                 break;
             }

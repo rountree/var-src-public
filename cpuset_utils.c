@@ -5,6 +5,17 @@
 #include <string.h>         // strtok_r(3), strchr(3)
 #include "cpuset_utils.h"
 #include "string_utils.h"   //
+
+void cpu2cpuset( const int cpu, cpu_set_t * const cpuset ){
+
+    CPU_ZERO( cpuset );
+    CPU_SET( cpu, cpuset );
+}
+
+size_t get_cpuset_count( cpu_set_t *cpuset ){
+    return (size_t)CPU_COUNT( cpuset );
+}
+
 void str2cpuset( const char * const s, cpu_set_t *cpuset ){
 
     if( NULL == s ){
@@ -15,6 +26,8 @@ void str2cpuset( const char * const s, cpu_set_t *cpuset ){
         printf( "%s:%d:%s Can't convert empty string to a cpuset.\n",
                 __FILE__, __LINE__, __func__);
     }
+
+    CPU_ZERO( cpuset );
 
     char * local_s = calloc( strlen(s) + 1, sizeof( char ) );
     assert( local_s );
