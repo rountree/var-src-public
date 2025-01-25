@@ -19,6 +19,7 @@
 #include "msr_safe.h"   // struct msr_batch_array, struct msr_batch_op, X86_IOC_MSR_BATCH
 #include "msr_version.h" //MSR_SAFE_VERSION_u32
 #include "xrstor.h"     // the xrstor benchmark
+#include "spin.h"       // the spin benchmark
 //
 // Internal header files:
 //
@@ -125,6 +126,8 @@ void* benchmark_thread_start( void *v ){
     assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutexes[t]) ) );
     if( job.benchmarks[ i ]->benchmark_type == XRSTOR ){
         run_xrstor( job.benchmarks[ i ] );
+    }else if( job.benchmarks[ i ]->benchmark_type == SPIN ){
+        run_spin( job.benchmarks[ i ] );
     }
     return 0;
 }

@@ -28,8 +28,8 @@ static void print_help( void ){
     printf( "  -l / --longitudinal=<longitudinal_type>:<sample_cpus>\n");
     printf( "  -p / --poll=<poll_type>:<control_cpu>:<sample_cpu>\n");
     printf( "\n");
-    printf( "The only (currently) valid benchmark is XRSTOR, which continuously\n");
-    printf( "  loads the AVX registers with the contents of a prepared memory\n");
+    printf( "The available benchmarks are XRSTOR and SPIN.\n");
+    printf( "  XRSTOR loads the AVX registers with the contents of a prepared memory\n");
     printf( "  region.  The user may specify multiple <execution_cpus>, but note\n");
     printf( "  that AVX registers may be a per-core resource, rather than per cpu.\n");
     printf( "  <benchmark_paramN> are two 64-bit values that will be used to fill all\n");
@@ -349,6 +349,8 @@ void parse_options( int argc, char **argv, struct job *job ){
                     // Benchmark type
                     if( 0 == strcmp( benchmarktype2str[XRSTOR], bch_type ) ){
                         job->benchmarks[ bch_idx ]->benchmark_type = XRSTOR;
+                    }else if( 0 == strcmp( benchmarktype2str[SPIN], bch_type ) ){
+                        job->benchmarks[ bch_idx ]->benchmark_type = SPIN;
                     }else{
                         printf( "%s:%d:%s Unknown benchmark type (%s).\n",
                                 __FILE__, __LINE__, __func__, bch_type );
@@ -358,7 +360,6 @@ void parse_options( int argc, char **argv, struct job *job ){
                     // cpu
                     current_cpu = get_next_cpu( current_cpu, 255, &all_cpus );
                     cpu2cpuset( current_cpu++, &(job->benchmarks[ bch_idx ]->execution_cpus) );
-                    printf("Added cpu %d to benchmark idx %zu.\n", current_cpu, bch_idx );
 
                     // Parameters
                     job->benchmarks[ bch_idx ]->benchmark_param1 = benchmark_param1;

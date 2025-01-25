@@ -31,8 +31,8 @@ CFLAGS+=-D_FORTIFY_SOURCE=3 -g -Og
 # Production
 # CFLAGS+=-O3
 
-vanallin: string_utils.o cpuset_utils.o msr_utils.o options.o xrstor.o main.o
-	$(CC) $(LDFLAGS) string_utils.o cpuset_utils.o msr_utils.o options.o xrstor.o main.o -o var
+vanallin: string_utils.o cpuset_utils.o msr_utils.o options.o xrstor.o spin.o main.o
+	$(CC) $(LDFLAGS) string_utils.o cpuset_utils.o msr_utils.o options.o xrstor.o spin.o main.o -o var
 
 clean:
 	rm -f *.o var
