@@ -26,12 +26,12 @@ CFLAGS+=-Werror
 LDFLAGS=-lpthread
 
 # Debugging
-CFLAGS+=-D_FORTIFY_SOURCE=3 -g -Og
+#CFLAGS+=-D_FORTIFY_SOURCE=3 -g -Og
 
 # Production
-# CFLAGS+=-O3
+CFLAGS+=-O2
 
-vanallin: string_utils.o cpuset_utils.o msr_utils.o options.o xrstor.o spin.o main.o
+vanallin: Makefile string_utils.o cpuset_utils.o msr_utils.o options.o xrstor.o spin.o main.o
 	$(CC) $(LDFLAGS) string_utils.o cpuset_utils.o msr_utils.o options.o xrstor.o spin.o main.o -o var
 
 clean:

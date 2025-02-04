@@ -65,7 +65,7 @@ struct benchmark_config{
     uint64_t                    executed_loops;
     pthread_t                   *benchmark_threads;
     pthread_mutex_t             *benchmark_mutexes;
-    bool                        *halt;
+    volatile bool               *halt;
 };
 
 struct longitudinal_config{
@@ -94,7 +94,7 @@ struct job{
 
     struct timespec             duration;           // (seconds) main sleeps this long (nanosleep is thread-safe).
     uint64_t                    debug_level;
-    bool                        halt;               // The big red off button.
+    volatile bool               halt;               // The big red off button.
 
 };
 
