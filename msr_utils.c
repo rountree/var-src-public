@@ -433,6 +433,31 @@ static void print_header( void ){
 
 static void print_op( struct msr_batch_op *o ){
 
+    static uint64_t previous_pkg_energy_status_value;
+    static uint64_t accumulated_pkg_energy_status_rollover;
+    const uint64_t ENERGY_ROLLOVER_OFFSET = 0x100000000;
+
+    // Only handle rollover for polls for now.
+    if( o->op & OP_POLL ){
+        if( o->msr == PKG_ENERGY_STATUS ){
+            o->msrdata += accumulated_pkg_energy_status_rollover;
+            o->msrdata2 += accumulated_pkg_energy_status_rollover;
+            // If the msrdata pkg_energy_status value rolled over, assume the msrdata2 value cannot
+            // within the same sample.
+            if( o->msrdata < previous_pkg_energy_status_value ){
+                o->msrdata  += ENERGY_ROLLOVER_OFFSET;
+                o->msrdata2 += ENERGY_ROLLOVER_OFFSET;
+                accumulated_pkg_energy_status_rollover += ENERGY_ROLLOVER_OFFSET;
+            }
+            // Rolloever happened during polling.
+            else if( o->msrdata2 < o->msrdata ){
+                o->msrdata2 += ENERGY_ROLLOVER_OFFSET;
+                accumulated_pkg_energy_status_rollover += ENERGY_ROLLOVER_OFFSET;
+            }
+            previous_pkg_energy_status_value = o->msrdata2;
+        }
+    }
+
     // All this can be stuffed into a single printf(), and I have done that several times, and
     // it's a pain to debug.  Doubt this will be noticably slower.
     printf("%#"PRIx16" ", (uint16_t)o->cpu);
