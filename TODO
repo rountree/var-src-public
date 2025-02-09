@@ -2,9 +2,8 @@ Adding a "sample" task should be fairly straightforward, although
 routing the SIGALRM signals might be nontrival (and do we really
 want to implement an alarm scheduler?).  The obvious use is
 accumulators that roll over often, e.g., PKG_ENERGY_STATUS.
-
-Could also add a "oneoff" task for MSRs that only need to be read
-once (e.g., RAPL units).
+Wouldn't mind having SAMPLE:control_cpu:sampled_cpus:msr:interval_ms
+Sampling as its own task hierarchy
 
 Change --seconds to --timeout that can take values with suffixes
 d (day), h (hour), m (minute), or s (seconds).
@@ -25,45 +24,29 @@ Parse /sys/devices/system/cpu?
 
 Add scrub_batch() to remove error codes (makes them reusable).
 
-Sampling as its own task hierarchy
-
 Longitudinal:  CAPFREQUENCY
 
 Longitudinal:  COLDSTART
 
 Longitudinal:  ZEROAMPERF
 
-To move things along, a benchmark that has an execution cpu_set_t
-with n eligible CPUs will cause n threads of that benchmark to be
-executed, with every thread using the same shared cpu_set_t.  We'll
-rely on the scheduler not to do anything stupid.  In the future,
-each thread should generate its own cpu_set_t with only the eligible
-cpu that it'll be using, and call sched_setaffinity() with it.
-
 Make address and thread sanitizing useful.
 https://stackoverflow.com/questions/77850769/fatal-threadsanitizer-unexpected-memory-mapping-when-running-on-linux-kernels
 
-Implement SLEEP and SPIN benchmarks
-
-Add global timer (including masking thread signals).
-
-Longitudinal:  RAPLBOUNDARY
-
-Add a "start" as an alias for "longitudinal".
-
-Use TSC instead of MPERF in msr-safe?
-
-vernier input 8-byte write val
-
-msr-safe allowlist overwrite option
-
-Write output to separate files.
+Remove SLEEP
 
 --dry-run
 
 clean up makefile
 
-Add option to clip TSC to 53 bits (work around R limitation).
+Write values that are potentially >32 bits as two separate 32-bit fields
+(gets around R limitation)
 
 If 0xdecafbad is in the error field, don't print the sample.
+
+Really need WAIT_UNTIL:msr:relation:value:mask:seconds
+
+Summary statistics
+
+
 
