@@ -48,10 +48,13 @@ static void print_help( void ){
     printf( "    on any particular processor.  Check the error field for whether or\n");
     printf( "    not a reading is meaningful.  All values are package-scope.\n");
     printf( "\n");
-    printf( "Valid <poll_types> are POWER, THERMAL, and FREQUENCY.  The model-\n");
-    printf( "  specific registers responsible for each are expected to be updated\n");
-    printf( "  at 1kHz (once per millisecond, more or less).  Each sample contains\n");
-    printf( "  the timestamped initial and changed register values.  If the value\n");
+    printf( "Valid <poll_types> are:\n");
+    printf( "    PKG_ENERGY, PP0_ENERGY, PP1_ENERGY, DRAM_ENERGY\n");
+    printf( "    CORE_THERMAL, PKG_THERMAL\n");
+    printf( "    FREQUENCY\n");
+    printf( "  The MSRs responsible for each are expected to be updated at 1kHz\n");
+    printf( "  (once per millisecond, more or less).  Each sample contains the\n");
+    printf( "  timestamped initial and changed register values.  If the value\n");
     printf( "  fails to change over roughly 10 milliseconds, the sample indicates\n");
     printf( "  the number of maximum reads was exceeded.\n");
     printf( "\n");
@@ -412,10 +415,18 @@ void parse_options( int argc, char **argv, struct job *job ){
                 }
 
                 // Fill in the struct
-                if( 0 == strcmp( polltype2str[POWER], pll_type ) ){
-                    pll->poll_type = POWER;
-                }else if( 0 == strcmp( polltype2str[THERMAL], pll_type ) ){
-                    pll->poll_type = THERMAL;
+                if( 0 == strcmp( polltype2str[PKG_ENERGY], pll_type ) ){
+                    pll->poll_type = PKG_ENERGY;
+                }else if( 0 == strcmp( polltype2str[PP0_ENERGY], pll_type ) ){
+                    pll->poll_type = PP0_ENERGY;
+                }else if( 0 == strcmp( polltype2str[PP1_ENERGY], pll_type ) ){
+                    pll->poll_type = PP1_ENERGY;
+                }else if( 0 == strcmp( polltype2str[DRAM_ENERGY], pll_type ) ){
+                    pll->poll_type = DRAM_ENERGY;
+                }else if( 0 == strcmp( polltype2str[PKG_THERMAL], pll_type ) ){
+                    pll->poll_type = PKG_THERMAL;
+                }else if( 0 == strcmp( polltype2str[CORE_THERMAL], pll_type ) ){
+                    pll->poll_type = CORE_THERMAL;
                 }else if( 0 == strcmp( polltype2str[FREQUENCY], pll_type ) ){
                     pll->poll_type = FREQUENCY;
                 }else{

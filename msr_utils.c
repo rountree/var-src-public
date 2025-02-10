@@ -190,8 +190,15 @@ static constexpr const struct msr_batch_op op_stop_global  = { .op = OP_WRITE | 
 
 // Polling instructions.  C and F need some attention.
 static constexpr const struct msr_batch_op op_poll_pkg_J = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = PKG_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_pp0_J = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = PP0_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_pp1_J = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = PP1_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_dram_J ={ .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = DRAM_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
+
+static constexpr const struct msr_batch_op op_poll_pkg_C = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = PACKAGE_THERM_STATUS,      .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_core_C = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = THERM_STATUS,      .poll_max=MAX_POLL_ATTEMPTS };
+
+
 static constexpr const struct msr_batch_op op_poll_pkg_F = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = PERF_STATUS,       .poll_max=MAX_POLL_ATTEMPTS };
-static constexpr const struct msr_batch_op op_poll_pkg_C = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = THERM_STATUS,      .poll_max=MAX_POLL_ATTEMPTS };
 
 // Single-read energy instructions.
 static constexpr const struct msr_batch_op op_rd_RAPL_POWER_UNIT         = { .op = OP_READ | OP_TSC_INITIAL, .msr = RAPL_POWER_UNIT };
@@ -284,10 +291,22 @@ static void setup_polling_batches( struct job *job ){
         // Leave the last op as all-zeros.
         const struct msr_batch_op * op;
         switch( job->polls[i]->poll_type ){
-            case POWER:
+            case PKG_ENERGY:
                 op = &op_poll_pkg_J;
                 break;
-            case THERMAL:
+            case PP0_ENERGY:
+                op = &op_poll_pp0_J;
+                break;
+            case PP1_ENERGY:
+                op = &op_poll_pp1_J;
+                break;
+            case DRAM_ENERGY:
+                op = &op_poll_dram_J;
+                break;
+            case CORE_THERMAL:
+                op = &op_poll_core_C;
+                break;
+            case PKG_THERMAL:
                 op = &op_poll_pkg_C;
                 break;
             case FREQUENCY:
@@ -433,10 +452,11 @@ static void print_header( void ){
 
 static void print_op( struct msr_batch_op *o ){
 
+#if 0
     static uint64_t previous_pkg_energy_status_value;
     static uint64_t accumulated_pkg_energy_status_rollover;
     const uint64_t ENERGY_ROLLOVER_OFFSET = 0x100000000;
-
+    This is supposed to happen in the thread, not here
     // Only handle rollover for polls for now.
     if( o->op & OP_POLL ){
         if( o->msr == PKG_ENERGY_STATUS ){
@@ -457,7 +477,7 @@ static void print_op( struct msr_batch_op *o ){
             previous_pkg_energy_status_value = o->msrdata2;
         }
     }
-
+#endif
     // All this can be stuffed into a single printf(), and I have done that several times, and
     // it's a pain to debug.  Doubt this will be noticably slower.
     printf("%#"PRIx16" ", (uint16_t)o->cpu);
@@ -485,6 +505,7 @@ static void print_op( struct msr_batch_op *o ){
     }
     printf("\n");
 }
+
 
 void dump_batches( struct job *job ){
 

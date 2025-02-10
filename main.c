@@ -84,7 +84,11 @@ void* poll_thread_start( void *v ){
             perror("");
             exit(-1);
         }
-        if( job.polls[i]->poll_type == POWER ){
+        if( job.polls[i]->poll_type == PKG_ENERGY
+         || job.polls[i]->poll_type == PP0_ENERGY
+         || job.polls[i]->poll_type == PP1_ENERGY
+         || job.polls[i]->poll_type == DRAM_ENERGY
+          ){
             // Handle the rollover case here so we don't have to reinvent solutions
             // in the analysis phase.
             job.polls[i]->poll_ops[b].msrdata  += cumulative_adjustment;
@@ -92,16 +96,15 @@ void* poll_thread_start( void *v ){
 
             // 1. Check to see if rollover happened within a poll op.
             if( job.polls[i]->poll_ops[b].msrdata2 < job.polls[i]->poll_ops[b].msrdata ){
-                cumulative_adjustment += rollover_adjustment;
                 job.polls[i]->poll_ops[b].msrdata2 += rollover_adjustment;
-            // 2. Cehck to see if rollover happened between ops.
+                cumulative_adjustment += rollover_adjustment;
+            // 2. Check to see if rollover happened between ops.
             }else if( (b > 0) && (job.polls[i]->poll_ops[b].msrdata < job.polls[i]->poll_ops[b-1].msrdata2) ){
                 job.polls[i]->poll_ops[b].msrdata  += rollover_adjustment;
                 job.polls[i]->poll_ops[b].msrdata2 += rollover_adjustment;
                 cumulative_adjustment += rollover_adjustment;
             }
         }
-
     }
     close( fd );
     return 0;

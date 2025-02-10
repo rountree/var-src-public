@@ -6,23 +6,14 @@
 #include <pthread.h>
 
 
-typedef enum{
-    POWER,
-    THERMAL,
-    FREQUENCY,
-} poll_t;
+typedef enum{                                PKG_ENERGY,   PP0_ENERGY,   PP1_ENERGY,   DRAM_ENERGY,   CORE_THERMAL,   PKG_THERMAL,   FREQUENCY, } poll_t;
+static const char * const polltype2str[] = {"PKG_ENERGY", "PP0_ENERGY", "PP1_ENERGY", "DRAM_ENERGY", "CORE_THERMAL", "PKG_THERMAL", "FREQUENCY" };
 
-typedef enum{
-    SLEEP,
-    SPIN,
-    XRSTOR,
-} benchmark_t;
+typedef enum{                                      SPIN,   XRSTOR, } benchmark_t;
+static const char * const benchmarktype2str[] = { "SPIN", "XRSTOR" };
 
-typedef enum{
-    FIXED_FUNCTION_COUNTERS,
-    ENERGY_COUNTERS,
-    NUM_LONGITUDINAL_FUNCTIONS,
-} longitudinal_t;
+typedef enum{                                        FIXED_FUNCTION_COUNTERS,   ENERGY_COUNTERS, NUM_LONGITUDINAL_FUNCTIONS, } longitudinal_t;
+static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS", "ENERGY_COUNTERS"                             };
 
 typedef enum{
     // For longitudinal recipes like fixed function performance counters, we want
@@ -41,9 +32,6 @@ typedef enum{
 } longitudinal_slot_t;
 
 
-static const char * const polltype2str[] = {"POWER", "THERMAL", "FREQUENCY"};
-static const char * const benchmarktype2str[] = {"SLEEP", "SPIN", "XRSTOR"};
-static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS", "ENERGY_COUNTERS"};
 
 struct poll_config{
     poll_t                      poll_type;
