@@ -530,8 +530,13 @@ static void print_summaries( struct job *job ){
         }
         o--;    // We want the last-non-DECAFBAD op.
         printf( "# SUMMARY %s\n", polltype2str[ job->polls[i]->poll_type ] );
-        printf( "# SUMMARY delta msrdata = %llu\n",
-                job->polls[i]->poll_ops[o].msrdata - job->polls[i]->poll_ops[0].msrdata );
+        if( PKG_ENERGY == job->polls[i]->poll_type
+         || PP0_ENERGY == job->polls[i]->poll_type
+         || PP1_ENERGY == job->polls[i]->poll_type
+         || DRAM_ENERGY == job->polls[i]->poll_type){
+            printf( "# SUMMARY delta msrdata = %llu\n",
+                    job->polls[i]->poll_ops[o].msrdata - job->polls[i]->poll_ops[0].msrdata );
+        }
         printf( "# SUMMARY delta tsc     = %llu\n",
                 job->polls[i]->poll_ops[o].tsc_final - job->polls[i]->poll_ops[0].tsc_initial );
         printf( "# SUMMARY initial C     = %llu\n",
