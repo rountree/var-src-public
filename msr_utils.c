@@ -14,6 +14,9 @@
 #include "cpuset_utils.h"   // get_next_cpu()
 #include "msr_utils.h"
 
+#define EXTRACT_TEMPERATURE(x) ( (x>>16) & 0x7fULL )
+#define UNUSED_OP ((__s32)(0xDECAFBAD))
+
 static const char * const op2str[] = {
     [OP_WRITE]          = "WRITE",
     [OP_READ]           = "READ",
@@ -327,7 +330,7 @@ static void setup_polling_batches( struct job *job ){
             job->polls[i]->poll_batches[j].ops = &(job->polls[i]->poll_ops[j]);
             memcpy( &(job->polls[i]->poll_ops[j]), op, sizeof( struct msr_batch_op ) );
             job->polls[i]->poll_ops[j].cpu = polled_cpu;
-            job->polls[i]->poll_ops[j].err = (uint32_t)(0xDECAFBAD);
+            job->polls[i]->poll_ops[j].err = UNUSED_OP;
        }
     }
 
@@ -385,7 +388,7 @@ static void setup_longitudinal_batches( struct job *job ){
                     memcpy( &(lng->batches[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ]),
                             longitudinal_recipes[ lng->longitudinal_type ][ slot_idx ][ op_idx ],
                             sizeof( struct msr_batch_op ) );
-                    lng->batches[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ].err = 0xDECAFBAD;
+                    lng->batches[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ].err = UNUSED_OP;
                     current_cpu = get_next_cpu( current_cpu, max_msrsafe_cpu, &(lng->sample_cpus) );
                     lng->batches[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ].cpu = current_cpu;
                     current_cpu++;
@@ -506,8 +509,42 @@ static void print_op( struct msr_batch_op *o ){
     printf("\n");
 }
 
+static void print_summaries( struct job *job ){
+
+    for( size_t i = 0; i < job->poll_count; i++ ){
+        if( job->polls[i]->total_ops < 2 ){
+            // If we don't have at least two ops, give up.
+            continue;
+        }
+        if( UNUSED_OP == job->polls[i]->poll_ops[0].err
+         || UNUSED_OP == job->polls[i]->poll_ops[0].err){
+            // If either or both of the first two ops were never used, give up.
+            continue;
+        }
+        // Find the last entry
+        size_t o;
+        for( o = 0; o < job->polls[i]->total_ops; o++ ){
+            if( UNUSED_OP == job->polls[i]->poll_ops[o].err ){
+                break;
+            }
+        }
+        o--;    // We want the last-non-DECAFBAD op.
+        printf( "# SUMMARY %s\n", polltype2str[ job->polls[i]->poll_type ] );
+        printf( "# SUMMARY delta msrdata = %llu\n",
+                job->polls[i]->poll_ops[o].msrdata - job->polls[i]->poll_ops[0].msrdata );
+        printf( "# SUMMARY delta tsc     = %llu\n",
+                job->polls[i]->poll_ops[o].tsc_final - job->polls[i]->poll_ops[0].tsc_initial );
+        printf( "# SUMMARY initial C     = %llu\n",
+                EXTRACT_TEMPERATURE( job->polls[i]->poll_ops[0].therm_initial ) );
+        printf( "# SUMMARY final C       = %llu\n",
+                EXTRACT_TEMPERATURE( job->polls[i]->poll_ops[o].therm_final ) );
+
+    }
+}
 
 void dump_batches( struct job *job ){
+
+    print_summaries( job );
 
     print_header();
 
