@@ -192,9 +192,9 @@ int main( int argc, char **argv ){
     }
 
     // Sleep (note nanosleep does not rely on signals and is safe for multithreaded use).
-    size_t sleep_loops = job.duration.tv_sec * 10;
-    job.duration.tv_sec = 0;
-    job.duration.tv_nsec = 100'000'000;  // 100ms
+    size_t sleep_loops = job.duration.tv_sec / 10;
+    job.duration.tv_sec = 10;
+    job.duration.tv_nsec = 0;
     for( size_t sleep_count = 0; sleep_count < sleep_loops; sleep_count++ ){
         nanosleep( &(job.duration), NULL );
         job.ab_selector = ! job.ab_selector;
