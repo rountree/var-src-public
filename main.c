@@ -69,41 +69,27 @@ void* poll_thread_start( void *v ){
     // poll task.
 
     size_t i = (size_t)v;
-    uint64_t cumulative_adjustment = 0;
-    constexpr const uint64_t rollover_adjustment = 1ULL << 32;
     assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.polls[i]->control_cpu ) ) );
     int fd = open( "/dev/cpu/msr_batch", O_RDONLY );
     assert( -1 != fd );
     assert( 0 == pthread_mutex_lock( &(job.polls[i]->poll_mutex) ) );
     for( size_t b = 0; b < job.polls[i]->total_ops && !(job.halt); b++ ){
         errno = 0;
+
+        // Recall there's a 1:1 relationship between batches and ops for polling.
+        if( job.ab_selector ){
+            job.polls[i]->poll_ops[b].op |= SELECTOR_INITIAL;
+        }
         int rc = ioctl( fd, X86_IOC_MSR_BATCH, &(job.polls[i]->poll_batches[b]) );
+        if( job.ab_selector ){
+            job.polls[i]->poll_ops[b].op |= SELECTOR_FINAL;
+        }
+
         if( -1 == rc ){
             fprintf( stderr, "%s:%d:%s ioctl in poll thread %zu batch %zu returned %d, errno=%d.\n",
                     __FILE__, __LINE__, __func__, i, b, rc, errno );
             perror("");
             exit(-1);
-        }
-        if( job.polls[i]->poll_type == PKG_ENERGY
-         || job.polls[i]->poll_type == PP0_ENERGY
-         || job.polls[i]->poll_type == PP1_ENERGY
-         || job.polls[i]->poll_type == DRAM_ENERGY
-          ){
-            // Handle the rollover case here so we don't have to reinvent solutions
-            // in the analysis phase.
-            job.polls[i]->poll_ops[b].msrdata  += cumulative_adjustment;
-            job.polls[i]->poll_ops[b].msrdata2 += cumulative_adjustment;
-
-            // 1. Check to see if rollover happened within a poll op.
-            if( job.polls[i]->poll_ops[b].msrdata2 < job.polls[i]->poll_ops[b].msrdata ){
-                job.polls[i]->poll_ops[b].msrdata2 += rollover_adjustment;
-                cumulative_adjustment += rollover_adjustment;
-            // 2. Check to see if rollover happened between ops.
-            }else if( (b > 0) && (job.polls[i]->poll_ops[b].msrdata < job.polls[i]->poll_ops[b-1].msrdata2) ){
-                job.polls[i]->poll_ops[b].msrdata  += rollover_adjustment;
-                job.polls[i]->poll_ops[b].msrdata2 += rollover_adjustment;
-                cumulative_adjustment += rollover_adjustment;
-            }
         }
     }
     close( fd );
@@ -131,6 +117,8 @@ void* benchmark_thread_start( void *v ){
         run_xrstor( job.benchmarks[ i ] );
     }else if( job.benchmarks[ i ]->benchmark_type == SPIN ){
         run_spin( job.benchmarks[ i ] );
+    }else if( job.benchmarks[ i ]->benchmark_type == ABXOR ){
+        run_abxor( job.benchmarks[ i ] );
     }
     return 0;
 }
@@ -159,8 +147,9 @@ int main( int argc, char **argv ){
         // Get the thread count via the execution_cpus cpu_set_t.
         size_t nthreads = (uint32_t)CPU_COUNT( &(job.benchmarks[i]->execution_cpus) );
 
-        // Point to the global halt variable
-        job.benchmarks[i]->halt = &job.halt;
+        // Point to the global halt and ab_selector variables
+        job.benchmarks[i]->halt        = &job.halt;
+        job.benchmarks[i]->ab_selector = &job.ab_selector;
 
         // Allocate space for nthreads pthread_t and pthread_mutex_t.
         job.benchmarks[i]->benchmark_threads = calloc( nthreads, sizeof( pthread_t ) );
@@ -203,7 +192,13 @@ int main( int argc, char **argv ){
     }
 
     // Sleep (note nanosleep does not rely on signals and is safe for multithreaded use).
-    nanosleep( &(job.duration), NULL );
+    size_t sleep_loops = job.duration.tv_sec * 10;
+    job.duration.tv_sec = 0;
+    job.duration.tv_nsec = 100'000'000;  // 100ms
+    for( size_t sleep_count = 0; sleep_count < sleep_loops; sleep_count++ ){
+        nanosleep( &(job.duration), NULL );
+        job.ab_selector = ! job.ab_selector;
+    }
 
     // Ring the bell.
     job.halt = true;

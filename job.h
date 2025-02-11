@@ -9,8 +9,8 @@
 typedef enum{                                PKG_ENERGY,   PP0_ENERGY,   PP1_ENERGY,   DRAM_ENERGY,   CORE_THERMAL,   PKG_THERMAL,   FREQUENCY, NUM_POLL_TYPES} poll_t;
 static const char * const polltype2str[] = {"PKG_ENERGY", "PP0_ENERGY", "PP1_ENERGY", "DRAM_ENERGY", "CORE_THERMAL", "PKG_THERMAL", "FREQUENCY" };
 
-typedef enum{                                      SPIN,   XRSTOR, } benchmark_t;
-static const char * const benchmarktype2str[] = { "SPIN", "XRSTOR" };
+typedef enum{                                      SPIN,   XRSTOR,   ABXOR  } benchmark_t;
+static const char * const benchmarktype2str[] = { "SPIN", "XRSTOR", "ABXOR" };
 
 typedef enum{                                        FIXED_FUNCTION_COUNTERS,   ENERGY_COUNTERS, NUM_LONGITUDINAL_FUNCTIONS, } longitudinal_t;
 static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS", "ENERGY_COUNTERS"                             };
@@ -50,10 +50,12 @@ struct benchmark_config{
     char                        *benchmark_addr;    // For XRSTOR, points to the xrstor region
     uint64_t                    benchmark_param1;   // Moving to 128-bit granularity
     uint64_t                    benchmark_param2;   //  across two 64-bit unsigned ints.
+    uint64_t                    benchmark_param3;
     uint64_t                    executed_loops;
     pthread_t                   *benchmark_threads;
     pthread_mutex_t             *benchmark_mutexes;
     volatile bool               *halt;
+    volatile bool               *ab_selector;
 };
 
 struct longitudinal_config{
@@ -83,6 +85,7 @@ struct job{
     struct timespec             duration;           // (seconds) main sleeps this long (nanosleep is thread-safe).
     uint64_t                    debug_level;
     volatile bool               halt;               // The big red off button.
+    volatile bool               ab_selector;
 
 };
 

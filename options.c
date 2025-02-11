@@ -24,11 +24,11 @@ static void print_help( void ){
     printf( "  -s / --seconds=<duration> (Default is 10 seconds)\n");
     printf( "\n");
     printf( "  -m / --main=<main_cpu>\n");
-    printf( "  -b / --benchmark=<benchmark_type>:<execution_cpus>:<benchmark_param1>:<benchmark_param2>\n");
+    printf( "  -b / --benchmark=<benchmark_type>:<execution_cpus>:<param1>:<param2>:<param3>\n");
     printf( "  -l / --longitudinal=<longitudinal_type>:<sample_cpus>\n");
     printf( "  -p / --poll=<poll_type>:<control_cpu>:<sample_cpu>\n");
     printf( "\n");
-    printf( "The available benchmarks are XRSTOR and SPIN.\n");
+    printf( "The available benchmarks are XRSTOR, SPIN, and ABXOR.\n");
     printf( "  XRSTOR loads the AVX registers with the contents of a prepared memory\n");
     printf( "  region.  The user may specify multiple <execution_cpus>, but note\n");
     printf( "  that AVX registers may be a per-core resource, rather than per cpu.\n");
@@ -89,9 +89,11 @@ static void print_parameters( struct job *job ){
 
     // benchmarks
     for( size_t i = 0; i < job->benchmark_count; i++ ){
-        printf("# benchmark %zu of %zu:  type=%s. parameters=%#"PRIx64", %#"PRIx64".\n",
+        printf("# benchmark %zu of %zu:  type=%s. parameters=%#"PRIx64", %#"PRIx64", %#"PRIx64".\n",
                 i, job->benchmark_count, benchmarktype2str[ job->benchmarks[i]->benchmark_type ],
-                job->benchmarks[i]->benchmark_param1, job->benchmarks[i]->benchmark_param2 );
+                job->benchmarks[i]->benchmark_param1,
+                job->benchmarks[i]->benchmark_param2,
+                job->benchmarks[i]->benchmark_param3 );
         printf("#          execution cpu id(s):  ");
         print_cpuset( &job->benchmarks[i]->execution_cpus );
     }
@@ -301,6 +303,7 @@ void parse_options( int argc, char **argv, struct job *job ){
                 char *bch_cpuset = strtok_r( NULL, ":", &saveptr );
                 char *bch_param1  = strtok_r( NULL, ":", &saveptr );
                 char *bch_param2  = strtok_r( NULL, ":", &saveptr );
+                char *bch_param3  = strtok_r( NULL, ":", &saveptr );
                 char *should_be_null = strtok_r( NULL, ":", &saveptr );
                 if( NULL == bch_cpuset ){
                     printf( "%s:%d:%s Parameter (%s) to -b/--benchmark missing <execution_cpus>.\n",
@@ -308,12 +311,17 @@ void parse_options( int argc, char **argv, struct job *job ){
                     exit( -1 ) ;
                 }
                 if( NULL == bch_param1 ){
-                    printf( "%s:%d:%s Parameter (%s) to -b/--benchmark missing <benchmark_param1>.\n",
+                    printf( "%s:%d:%s Parameter (%s) to -b/--benchmark missing <param1>.\n",
                             __FILE__, __LINE__, __func__, optarg);
                     exit(-1);
                 }
                 if( NULL == bch_param2 ){
-                    printf( "%s:%d:%s Parameter (%s) to -b/--benchmark missing <benchmark_param2>.\n",
+                    printf( "%s:%d:%s Parameter (%s) to -b/--benchmark missing <param2>.\n",
+                            __FILE__, __LINE__, __func__, optarg);
+                    exit(-1);
+                }
+                if( NULL == bch_param3 ){
+                    printf( "%s:%d:%s Parameter (%s) to -b/--benchmark missing <param3>.\n",
                             __FILE__, __LINE__, __func__, optarg);
                     exit(-1);
                 }
@@ -341,6 +349,7 @@ void parse_options( int argc, char **argv, struct job *job ){
                 // Grab the parameters
                 uint64_t benchmark_param1 = safe_strtoull( bch_param1 );
                 uint64_t benchmark_param2 = safe_strtoull( bch_param2 );
+                uint64_t benchmark_param3 = safe_strtoull( bch_param3 );
 
                 // Allocate and fill in the structs.
                 for( size_t bch_idx = first_new_benchmark_idx; bch_idx < job->benchmark_count; bch_idx++ ){
@@ -354,6 +363,8 @@ void parse_options( int argc, char **argv, struct job *job ){
                         job->benchmarks[ bch_idx ]->benchmark_type = XRSTOR;
                     }else if( 0 == strcmp( benchmarktype2str[SPIN], bch_type ) ){
                         job->benchmarks[ bch_idx ]->benchmark_type = SPIN;
+                    }else if( 0 == strcmp( benchmarktype2str[ABXOR], bch_type ) ){
+                        job->benchmarks[ bch_idx ]->benchmark_type = ABXOR;
                     }else{
                         printf( "%s:%d:%s Unknown benchmark type (%s).\n",
                                 __FILE__, __LINE__, __func__, bch_type );
@@ -367,6 +378,7 @@ void parse_options( int argc, char **argv, struct job *job ){
                     // Parameters
                     job->benchmarks[ bch_idx ]->benchmark_param1 = benchmark_param1;
                     job->benchmarks[ bch_idx ]->benchmark_param2 = benchmark_param2;
+                    job->benchmarks[ bch_idx ]->benchmark_param3 = benchmark_param3;
 
                 }
 

@@ -547,7 +547,55 @@ static void print_summaries( struct job *job ){
     }
 }
 
+static void cleanup_poll_data( struct job *job ){
+
+    uint64_t cumulative_adjustment = 0;
+    constexpr const uint64_t rollover_adjustment = 1ULL << 32;
+
+    for( size_t i = 0; i < job->poll_count; i++ ){
+        if( job->polls[i]->poll_type == PKG_ENERGY
+         || job->polls[i]->poll_type == PP0_ENERGY
+         || job->polls[i]->poll_type == PP1_ENERGY
+         || job->polls[i]->poll_type == DRAM_ENERGY
+        ){
+            for( size_t b = 0; b < job->polls[i]->total_ops; b++ ){
+
+                // Handle the rollover case here so we don't have to reinvent solutions
+                // in the analysis phase.
+                job->polls[i]->poll_ops[b].msrdata  += cumulative_adjustment;
+                job->polls[i]->poll_ops[b].msrdata2 += cumulative_adjustment;
+
+                // 1. Check to see if rollover happened within a poll op.
+                if( job->polls[i]->poll_ops[b].msrdata2 < job->polls[i]->poll_ops[b].msrdata ){
+                    job->polls[i]->poll_ops[b].msrdata2 += rollover_adjustment;
+                    cumulative_adjustment += rollover_adjustment;
+
+                // 2. Check to see if rollover happened between ops.
+                }else if( (b > 0) && (job->polls[i]->poll_ops[b].msrdata < job->polls[i]->poll_ops[b-1].msrdata2) ){
+                    job->polls[i]->poll_ops[b].msrdata  += rollover_adjustment;
+                    job->polls[i]->poll_ops[b].msrdata2 += rollover_adjustment;
+                    cumulative_adjustment += rollover_adjustment;
+                }
+            }
+        }
+    }
+
+    for( size_t i = 0; i < job->poll_count; i++ ){
+        for( size_t b = 0; b < job->polls[i]->total_ops; b++ ){
+            if( job->polls[i]->poll_ops[b].op & OP_THERM_INITIAL ){
+                job->polls[i]->poll_ops[b].therm_initial = (job->polls[i]->poll_ops[b].therm_initial >> 16) & 0x7f;
+            }
+            if( job->polls[i]->poll_ops[b].op & OP_THERM_FINAL ){
+                job->polls[i]->poll_ops[b].therm_final = (job->polls[i]->poll_ops[b].therm_final >> 16) & 0x7f;
+            }
+            job->polls[i]->poll_ops[b].wmask =  job->polls[i]->poll_ops[b].op >> 12;
+        }
+    }
+}
+
 void dump_batches( struct job *job ){
+
+    cleanup_poll_data( job );
 
     print_summaries( job );
 
