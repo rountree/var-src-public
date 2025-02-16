@@ -97,28 +97,17 @@ void* poll_thread_start( void *v ){
 }
 
 void* benchmark_thread_start( void *v ){
-    // The benchmark thread needs to know which job.benchmarks[?] it's working
-    // on.  If there is more than one elegible cpu in the execution_cpus cpu_set_t,
-    // it also needs to know the index to use for the mutex array.  Since we're
-    // on machines with relatively small numbers of cores, we'll rely on the fact
-    // that job is declared above in this translation unit and stuff the two
-    // indexes into our single 64-bit parameter.  There are better ways, but this
-    // codes quickly.
-    //
-    // Each thread in a benchmarks[x] uses the same execution_cpus cpu_set_t.
-    // For now we'll rely on reasonable kernel scheduling.  Might come back later
-    // and pin each thread to a single cpu.
 
-    size_t i = (size_t)(((uint64_t)v) >> 32);
-    size_t t = (size_t)(((uint64_t)v) & 0x00000000FFFFFFFFULL );
-    assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.benchmarks[i]->execution_cpus ) ) );
-    assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutexes[t]) ) );
-    if( job.benchmarks[ i ]->benchmark_type == XRSTOR ){
-        run_xrstor( job.benchmarks[ i ] );
-    }else if( job.benchmarks[ i ]->benchmark_type == SPIN ){
-        run_spin( job.benchmarks[ i ] );
-    }else if( job.benchmarks[ i ]->benchmark_type == ABSHIFT ){
-        run_abxor( job.benchmarks[ i ] );
+    size_t benchmark_idx = (size_t)(((uint64_t)v) >> 32);
+    size_t thread_idx    = (size_t)(((uint64_t)v) & 0x00000000FFFFFFFFULL );
+    assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.benchmarks[ benchmark_idx ]->execution_cpus ) ) );
+    assert( 0 == pthread_mutex_lock( &(job.benchmarks[ benchmark_idx ]->benchmark_mutexes[ thread_idx ]) ) );
+    if( job.benchmarks[ benchmark_idx ]->benchmark_type == XRSTOR ){
+        run_xrstor( job.benchmarks[ benchmark_idx ] );
+    }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == SPIN ){
+        run_spin( job.benchmarks[ benchmark_idx ] );
+    }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == ABSHIFT ){
+        run_abxor( job.benchmarks[ benchmark_idx ] );
     }
     return 0;
 }
@@ -159,11 +148,11 @@ int main( int argc, char **argv ){
         assert( job.benchmarks[i]->benchmark_mutexes );
 
         // Set up each thread.
-        for( uint32_t t = 0; t < nthreads; t++ ){
-            assert( 0 == pthread_mutex_init( &(job.benchmarks[i]->benchmark_mutexes[t]), NULL ) );
-            assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutexes[t]) ) );
-            assert( 0 == pthread_create(     &(job.benchmarks[i]->benchmark_threads[t]),
-                    NULL, benchmark_thread_start, (void*)( (((uint64_t)i) << 32) | t ) ) );
+        for( uint32_t t_idx = 0; t_idx < nthreads; t_idx++ ){
+            assert( 0 == pthread_mutex_init( &(job.benchmarks[i]->benchmark_mutexes[t_idx]), NULL ) );
+            assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutexes[t_idx]) ) );
+            assert( 0 == pthread_create(     &(job.benchmarks[i]->benchmark_threads[t_idx]),
+                    NULL, benchmark_thread_start, (void*)( (((uint64_t)i) << 32) | t_idx ) ) );
         }
     }
 

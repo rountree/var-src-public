@@ -49,5 +49,4 @@ Add PLATFORM_ENERGY to polling
 
 Replace asserts with intelligible error messages.
 
-Verify we can handle large CPU counts.
 
