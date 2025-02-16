@@ -56,3 +56,4 @@ Rename ABXOR to ABSHIFT
 
 Randomize choice of AB benchmarks
 
+Replace asserts with intelligible error messages.
