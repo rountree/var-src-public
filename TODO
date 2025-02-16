@@ -30,8 +30,6 @@ Longitudinal:  ZEROAMPERF
 Make address and thread sanitizing useful.
 https://stackoverflow.com/questions/77850769/fatal-threadsanitizer-unexpected-memory-mapping-when-running-on-linux-kernels
 
-Remove SLEEP
-
 --dry-run
 
 clean up makefile
@@ -49,4 +47,9 @@ Add PLATFORM_ENERGY to polling
 
 Replace asserts with intelligible error messages.
 
+Verify if msr-safe is going pkg or core thermals
+
+Separate output files
+
+Update options dump
 
