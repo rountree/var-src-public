@@ -4,7 +4,7 @@
 #include <pthread.h>    // PTHREAD_MUTEX_INITIALIZER, pthread_mutex_[lock|unlock](3p)
 #include <sched.h>      // cpu_set_t and friends, CPU_SETSIZE, sched_[get|set]affinity(2)
 #include <getopt.h>     // getopt_long(3)
-#include <stdlib.h>     // exit(3), malloc(3)
+#include <stdlib.h>     // exit(3), malloc(3), random(3), srandom(3)
 #include <stdio.h>      // printf(3)
 #include <stdint.h>     // uint64_t, etc.
 #include <inttypes.h>   // PRIu64, etc.
@@ -125,6 +125,7 @@ void* benchmark_thread_start( void *v ){
 
 int main( int argc, char **argv ){
 
+    srandom(13);
     sizeof_check();
     parse_options( argc, argv, &job );
     populate_allowlist();
@@ -192,13 +193,26 @@ int main( int argc, char **argv ){
     }
 
     // Sleep (note nanosleep does not rely on signals and is safe for multithreaded use).
-    size_t sleep_loops = job.duration.tv_sec;
-    job.duration.tv_sec = 1;
-    job.duration.tv_nsec = 0;
-    for( size_t sleep_count = 0; sleep_count < sleep_loops; sleep_count++ ){
-        nanosleep( &(job.duration), NULL );
-        job.ab_selector = ! job.ab_selector;
-    }
+    struct timespec elapsed;
+    elapsed.tv_sec  = 0;
+    elapsed.tv_nsec = 0;;
+    uint64_t iterations[2] = {0,0};
+    do{
+        if( job.ab_randomized ){
+            job.ab_selector = random() & 0x1;
+        }else{
+            job.ab_selector = ! job.ab_selector;
+        }
+
+        nanosleep( &(job.ab_duration), NULL );
+
+        iterations[ job.ab_selector ]++;
+
+        elapsed.tv_sec =
+            job.ab_duration.tv_sec    + elapsed.tv_sec +
+            ( job.ab_duration.tv_nsec + elapsed.tv_nsec > 999'999'999L ? 1 : 0 );
+        elapsed.tv_nsec = ( job.ab_duration.tv_nsec + elapsed.tv_nsec ) % 999'999'999L;
+    }while( elapsed.tv_sec < job.duration.tv_sec );
 
     // Ring the bell.
     job.halt = true;
@@ -214,6 +228,8 @@ int main( int argc, char **argv ){
     for( size_t i = 0; i < job.poll_count; i++ ){
         assert( 0 == pthread_join( job.polls[i]->poll_thread, NULL ) );
     }
+
+    printf("# a|b iterations:  %"PRIu64", %"PRIu64".\n", iterations[0], iterations[1]);
 
     run_longitudinal_batches( &job, STOP );
     run_longitudinal_batches( &job, READ );

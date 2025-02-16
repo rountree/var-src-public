@@ -28,6 +28,9 @@ static void print_help( void ){
     printf( "  -l / --longitudinal=<longitudinal_type>:<sample_cpus>\n");
     printf( "  -p / --poll=<poll_type>:<control_cpu>:<sample_cpu>\n");
     printf( "\n");
+    printf( "  -R / --abRandomized (enables random a|b selection)\n");
+    printf( "  -S / --abDuration=<seconds>:<milliseconds (default is 1:0)\n");
+    printf( "\n");
     printf( "The available benchmarks are XRSTOR, SPIN, and ABSHIFT.\n");
     printf( "  XRSTOR loads the AVX registers with the contents of a prepared memory\n");
     printf( "  region.  The user may specify multiple <execution_cpus>, but note\n");
@@ -200,7 +203,12 @@ static void cpuset_checks( struct job *job ){
 
 void parse_options( int argc, char **argv, struct job *job ){
     // Default values:
-    job->duration.tv_sec = 10;
+    job->duration.tv_sec     = 10;
+    job->duration.tv_nsec    =  0;
+    job->ab_randomized       =  false;
+    job->ab_duration.tv_sec  =  1;
+    job->ab_duration.tv_nsec =  0;
+
 
     static struct option long_options[] = {
         { .name = "benchmark",    .has_arg = required_argument, .flag = NULL, .val = 'b' },
@@ -211,29 +219,68 @@ void parse_options( int argc, char **argv, struct job *job ){
         { .name = "poll",         .has_arg = required_argument, .flag = NULL, .val = 'p' },
         { .name = "seconds",      .has_arg = required_argument, .flag = NULL, .val = 's' },
         { .name = "version",      .has_arg = no_argument,       .flag = NULL, .val = 'v' },
+        { .name = "abDuration",   .has_arg = required_argument, .flag = NULL, .val = 'S' },
+        { .name = "abRandomize",  .has_arg = no_argument,       .flag = NULL, .val = 'R' },
         { 0, 0, 0, 0}
     };
 
     while(1){
-        int c = getopt_long( argc, argv, ":b:d:hl:m:p:s:v", long_options, NULL );
+        int c = getopt_long( argc, argv, ":RS:b:d:hl:m:p:s:v", long_options, NULL );
         if( -1 == c ){
             break;
         }
         switch( c ){
             default:
-                printf(" %s:%d:%s No idea what just happened.  Don't do that.\n",
-                        __FILE__, __LINE__, __func__ );
+                printf(" %s:%d:%s optopt='%c' No idea what just happened.  Don't do that.\n",
+                        __FILE__, __LINE__, __func__, optopt );
                 exit(-1);
                 break;
             case '?':
-                printf(" %s:%d:%s Unknown options, ambiguous match, or extraneous parameter. \n",
-                        __FILE__, __LINE__, __func__ );
+                printf(" %s:%d:%s optopt='%c' Unknown options, ambiguous match, or extraneous parameter. \n",
+                        __FILE__, __LINE__, __func__, optopt );
                 exit(-1);
                 break;
             case ':':
-                printf(" %s:%d:%s Missing argument.  Hope that helped.\n",
-                        __FILE__, __LINE__, __func__);
+                printf(" %s:%d:%s optopt='%c' Missing argument.  Hope that helped.\n",
+                        __FILE__, __LINE__, __func__, optopt);
                 exit(-1);
+                break;
+            case 'S':     // a|b duration
+            {
+                char *local_optarg = strdup( optarg );
+                char *saveptr = NULL;
+                char *seconds        = strtok_r( local_optarg, ":", &saveptr );
+                char *milliseconds   = strtok_r( NULL,         ":", &saveptr );
+                char *should_be_null = strtok_r( NULL,         ":", &saveptr );
+
+                if( NULL == seconds ){
+                    printf( "%s:%d:%s Parameter (%s) to -S/--ab_duration is missing <seconds>.\n",
+                            __FILE__, __LINE__, __func__, optarg);
+                    exit(-1);
+                }
+                if( NULL == milliseconds ){
+                    printf( "%s:%d:%s Parameter (%s) to -S/--ab_duration is missing <milliseconds>.\n",
+                            __FILE__, __LINE__, __func__, optarg);
+                    exit(-1);
+                }
+                if( NULL != should_be_null ){
+                    printf( "%s:%d:%s Extra parameters in -S/--ab_duration (%s).\n",
+                            __FILE__, __LINE__, __func__, optarg);
+                    exit(-1);
+                }
+
+                job->ab_duration.tv_sec  = safe_strtoull( seconds );
+                job->ab_duration.tv_nsec = safe_strtoull( milliseconds) * 1'000'000L;
+                if( job->ab_duration.tv_nsec > 999'999'999L ){
+                    printf( "%s:%d:%s Milliseconds term in -S/--ab_duration > 999.\n",
+                            __FILE__, __LINE__, __func__ );
+                    exit(-1);
+                }
+                free( local_optarg );
+                break;
+            }
+            case 'R':
+                job->ab_randomized = true;
                 break;
             case 'd':   // debug_level
                 job->debug_level = safe_strtoull( optarg );
@@ -269,7 +316,7 @@ void parse_options( int argc, char **argv, struct job *job ){
                 char *lng_cpuset = strtok_r( NULL, ":", &saveptr );
                 char *should_be_null = strtok_r( NULL, ":", &saveptr);
                 if( NULL == lng_cpuset ){
-                    printf( "%s:%d:%s Parameter (%s) to -l/--longitudinal missing <sample_cpus>.\n",
+                    printf( "%s:%d:%s Parameter (%s) to -l/--longitudinal is missing <sample_cpus>.\n",
                             __FILE__, __LINE__, __func__, optarg);
                     exit( -1 ) ;
                 }
