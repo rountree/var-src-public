@@ -5,9 +5,6 @@ accumulators that roll over often, e.g., PKG_ENERGY_STATUS.
 Wouldn't mind having SAMPLE:control_cpu:sampled_cpus:msr:interval_ms
 Sampling as its own task hierarchy
 
-Change --seconds to --timeout that can take values with suffixes
-d (day), h (hour), m (minute), or s (seconds).
-
 Put in a silly "printf the version" function and use it for both
 --help and --version.
 
