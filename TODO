@@ -52,8 +52,6 @@ Add PLATFORM_ENERGY to polling
 
 Check for minimum execution time on AB benchmarks
 
-Rename ABXOR to ABSHIFT
-
 Randomize choice of AB benchmarks
 
 Replace asserts with intelligible error messages.

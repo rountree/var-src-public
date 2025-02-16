@@ -9,8 +9,8 @@
 typedef enum{                                PKG_ENERGY,   PP0_ENERGY,   PP1_ENERGY,   DRAM_ENERGY,   CORE_THERMAL,   PKG_THERMAL,   FREQUENCY, NUM_POLL_TYPES} poll_t;
 static const char * const polltype2str[] = {"PKG_ENERGY", "PP0_ENERGY", "PP1_ENERGY", "DRAM_ENERGY", "CORE_THERMAL", "PKG_THERMAL", "FREQUENCY" };
 
-typedef enum{                                      SPIN,   XRSTOR,   ABXOR  } benchmark_t;
-static const char * const benchmarktype2str[] = { "SPIN", "XRSTOR", "ABXOR" };
+typedef enum{                                      SPIN,   XRSTOR,   ABSHIFT  } benchmark_t;
+static const char * const benchmarktype2str[] = { "SPIN", "XRSTOR", "ABSHIFT" };
 
 typedef enum{                                        FIXED_FUNCTION_COUNTERS,   ENERGY_COUNTERS, NUM_LONGITUDINAL_FUNCTIONS, } longitudinal_t;
 static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS", "ENERGY_COUNTERS"                             };

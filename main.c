@@ -117,7 +117,7 @@ void* benchmark_thread_start( void *v ){
         run_xrstor( job.benchmarks[ i ] );
     }else if( job.benchmarks[ i ]->benchmark_type == SPIN ){
         run_spin( job.benchmarks[ i ] );
-    }else if( job.benchmarks[ i ]->benchmark_type == ABXOR ){
+    }else if( job.benchmarks[ i ]->benchmark_type == ABSHIFT ){
         run_abxor( job.benchmarks[ i ] );
     }
     return 0;
@@ -192,8 +192,8 @@ int main( int argc, char **argv ){
     }
 
     // Sleep (note nanosleep does not rely on signals and is safe for multithreaded use).
-    size_t sleep_loops = job.duration.tv_sec / 10;
-    job.duration.tv_sec = 10;
+    size_t sleep_loops = job.duration.tv_sec;
+    job.duration.tv_sec = 1;
     job.duration.tv_nsec = 0;
     for( size_t sleep_count = 0; sleep_count < sleep_loops; sleep_count++ ){
         nanosleep( &(job.duration), NULL );

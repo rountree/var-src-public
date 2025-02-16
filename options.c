@@ -28,7 +28,7 @@ static void print_help( void ){
     printf( "  -l / --longitudinal=<longitudinal_type>:<sample_cpus>\n");
     printf( "  -p / --poll=<poll_type>:<control_cpu>:<sample_cpu>\n");
     printf( "\n");
-    printf( "The available benchmarks are XRSTOR, SPIN, and ABXOR.\n");
+    printf( "The available benchmarks are XRSTOR, SPIN, and ABSHIFT.\n");
     printf( "  XRSTOR loads the AVX registers with the contents of a prepared memory\n");
     printf( "  region.  The user may specify multiple <execution_cpus>, but note\n");
     printf( "  that AVX registers may be a per-core resource, rather than per cpu.\n");
@@ -363,8 +363,8 @@ void parse_options( int argc, char **argv, struct job *job ){
                         job->benchmarks[ bch_idx ]->benchmark_type = XRSTOR;
                     }else if( 0 == strcmp( benchmarktype2str[SPIN], bch_type ) ){
                         job->benchmarks[ bch_idx ]->benchmark_type = SPIN;
-                    }else if( 0 == strcmp( benchmarktype2str[ABXOR], bch_type ) ){
-                        job->benchmarks[ bch_idx ]->benchmark_type = ABXOR;
+                    }else if( 0 == strcmp( benchmarktype2str[ABSHIFT], bch_type ) ){
+                        job->benchmarks[ bch_idx ]->benchmark_type = ABSHIFT;
                     }else{
                         printf( "%s:%d:%s Unknown benchmark type (%s).\n",
                                 __FILE__, __LINE__, __func__, bch_type );
