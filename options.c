@@ -21,7 +21,7 @@ static void print_help( void ){
     printf( "  -v / --version   Print version information and exit.\n");
     printf( "  -d / --debug_level=<level> (Higher is more verbose, max is 3.)\n");
     printf( "\n");
-    printf( "  -s / --seconds=<duration> (Default is 10 seconds)\n");
+    printf( "  -t / --time=<hours>:<minutes>:<seconds> (Default is 10 seconds)\n");
     printf( "\n");
     printf( "  -m / --main=<main_cpu>\n");
     printf( "  -b / --benchmark=<benchmark_type>:<execution_cpus>:<param1>:<param2>:<param3>\n");
@@ -29,7 +29,7 @@ static void print_help( void ){
     printf( "  -p / --poll=<poll_type>:<control_cpu>:<sample_cpu>\n");
     printf( "\n");
     printf( "  -R / --abRandomized (enables random a|b selection)\n");
-    printf( "  -S / --abDuration=<seconds>:<milliseconds (default is 1:0)\n");
+    printf( "  -T / --abTime=<seconds>:<milliseconds (default is 1 second)\n");
     printf( "\n");
     printf( "The available benchmarks are XRSTOR, SPIN, and ABSHIFT.\n");
     printf( "  XRSTOR loads the AVX registers with the contents of a prepared memory\n");
@@ -217,15 +217,15 @@ void parse_options( int argc, char **argv, struct job *job ){
         { .name = "longitudinal", .has_arg = required_argument, .flag = NULL, .val = 'l' },
         { .name = "main",         .has_arg = required_argument, .flag = NULL, .val = 'm' },
         { .name = "poll",         .has_arg = required_argument, .flag = NULL, .val = 'p' },
-        { .name = "seconds",      .has_arg = required_argument, .flag = NULL, .val = 's' },
+        { .name = "time",         .has_arg = required_argument, .flag = NULL, .val = 't' },
         { .name = "version",      .has_arg = no_argument,       .flag = NULL, .val = 'v' },
-        { .name = "abDuration",   .has_arg = required_argument, .flag = NULL, .val = 'S' },
+        { .name = "abTime",       .has_arg = required_argument, .flag = NULL, .val = 'T' },
         { .name = "abRandomize",  .has_arg = no_argument,       .flag = NULL, .val = 'R' },
         { 0, 0, 0, 0}
     };
 
     while(1){
-        int c = getopt_long( argc, argv, ":RS:b:d:hl:m:p:s:v", long_options, NULL );
+        int c = getopt_long( argc, argv, ":RT:b:d:hl:m:p:t:v", long_options, NULL );
         if( -1 == c ){
             break;
         }
@@ -245,7 +245,7 @@ void parse_options( int argc, char **argv, struct job *job ){
                         __FILE__, __LINE__, __func__, optopt);
                 exit(-1);
                 break;
-            case 'S':     // a|b duration
+            case 'T':     // a|b duration
             {
                 char *local_optarg = strdup( optarg );
                 char *saveptr = NULL;
@@ -285,9 +285,29 @@ void parse_options( int argc, char **argv, struct job *job ){
             case 'd':   // debug_level
                 job->debug_level = safe_strtoull( optarg );
                 break;
-            case 's':   // seconds
-                job->duration.tv_sec = safe_strtoull( optarg );
+            case 't':   // time
+            {
+                char *local_optarg = strdup( optarg );
+                char *saveptr        = NULL;
+                char *hours          = strtok_r( local_optarg, ":", &saveptr );
+                char *minutes        = strtok_r( NULL,         ":", &saveptr );
+                char *seconds        = strtok_r( NULL,         ":", &saveptr );
+                char *should_be_null = strtok_r( NULL,         ":", &saveptr );
+
+                if( (NULL == hours) || ( NULL == minutes ) || ( NULL == seconds ) || ( NULL != should_be_null ) ) {
+                    printf("%s:%d:%s -t / --time format is <hours>:<minutes>:<seconds>\n"
+                            "Got optarg=%s parsed as %s:%s:%s instead.\n"
+                            "should_be_null = %s\n",
+                            __FILE__, __LINE__, __func__, optarg, hours, minutes, seconds, should_be_null );
+                    exit(-1);
+                }
+                job->duration.tv_sec =
+                    safe_strtoull( seconds )
+                    + safe_strtoull( minutes ) * 60L
+                    + safe_strtoull( hours )   * 60L * 60L;
+                free( local_optarg );
                 break;
+            }
             case 'm':   // main
                 str2cpuset( optarg, &job->main_cpu );
                 break;
@@ -340,7 +360,7 @@ void parse_options( int argc, char **argv, struct job *job ){
 
                 free(local_optarg);
                 break;
-             }
+            }
             case 'b':   // benchmark
             {
                 // Parse optarg

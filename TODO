@@ -50,8 +50,7 @@ Summary statistics
 
 Add PLATFORM_ENERGY to polling
 
-Check for minimum execution time on AB benchmarks
-
-Randomize choice of AB benchmarks
-
 Replace asserts with intelligible error messages.
+
+Verify we can handle large CPU counts.
+
