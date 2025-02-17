@@ -53,3 +53,7 @@ Separate output files
 
 Update options dump
 
+Make executed_loops thread-safe
+
+
+
