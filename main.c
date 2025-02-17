@@ -103,11 +103,11 @@ void* benchmark_thread_start( void *v ){
     assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.benchmarks[ benchmark_idx ]->execution_cpus ) ) );
     assert( 0 == pthread_mutex_lock( &(job.benchmarks[ benchmark_idx ]->benchmark_mutexes[ thread_idx ]) ) );
     if( job.benchmarks[ benchmark_idx ]->benchmark_type == XRSTOR ){
-        run_xrstor( job.benchmarks[ benchmark_idx ] );
+        run_xrstor( job.benchmarks[ benchmark_idx ], thread_idx );
     }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == SPIN ){
-        run_spin( job.benchmarks[ benchmark_idx ] );
+        run_spin( job.benchmarks[ benchmark_idx ], thread_idx );
     }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == ABSHIFT ){
-        run_abxor( job.benchmarks[ benchmark_idx ] );
+        run_abxor( job.benchmarks[ benchmark_idx ], thread_idx );
     }
     return 0;
 }
@@ -135,20 +135,26 @@ int main( int argc, char **argv ){
     // Benchmark thread initialization
     for( uint32_t i = 0; i < job.benchmark_count; i++ ){
         // Get the thread count via the execution_cpus cpu_set_t.
-        size_t nthreads = (uint32_t)CPU_COUNT( &(job.benchmarks[i]->execution_cpus) );
+        job.benchmarks[i]->thread_count = (uint32_t)CPU_COUNT( &(job.benchmarks[i]->execution_cpus) );
 
         // Point to the global halt and ab_selector variables
         job.benchmarks[i]->halt        = &job.halt;
         job.benchmarks[i]->ab_selector = &job.ab_selector;
 
         // Allocate space for nthreads pthread_t and pthread_mutex_t.
-        job.benchmarks[i]->benchmark_threads = calloc( nthreads, sizeof( pthread_t ) );
+        job.benchmarks[i]->benchmark_threads = calloc( job.benchmarks[i]->thread_count, sizeof( pthread_t ) );
         assert( job.benchmarks[i]->benchmark_threads );
-        job.benchmarks[i]->benchmark_mutexes = calloc( nthreads, sizeof( pthread_mutex_t ) );
+        job.benchmarks[i]->benchmark_mutexes = calloc( job.benchmarks[i]->thread_count, sizeof( pthread_mutex_t ) );
         assert( job.benchmarks[i]->benchmark_mutexes );
 
+        // Allocate space for executed_loops.
+        job.benchmarks[i]->executed_loops[0] = calloc( job.benchmarks[i]->thread_count, sizeof( uint64_t ) );
+        assert( job.benchmarks[i]->executed_loops[0] );
+        job.benchmarks[i]->executed_loops[1] = calloc( job.benchmarks[i]->thread_count, sizeof( uint64_t ) );
+        assert( job.benchmarks[i]->executed_loops[1] );
+
         // Set up each thread.
-        for( uint32_t t_idx = 0; t_idx < nthreads; t_idx++ ){
+        for( uint32_t t_idx = 0; t_idx < job.benchmarks[i]->thread_count; t_idx++ ){
             assert( 0 == pthread_mutex_init( &(job.benchmarks[i]->benchmark_mutexes[t_idx]), NULL ) );
             assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutexes[t_idx]) ) );
             assert( 0 == pthread_create(     &(job.benchmarks[i]->benchmark_threads[t_idx]),
@@ -235,6 +241,8 @@ int main( int argc, char **argv ){
         }
         free( job.benchmarks[i]->benchmark_threads );
         free( job.benchmarks[i]->benchmark_mutexes );
+        free( job.benchmarks[i]->executed_loops[ 0 ] );
+        free( job.benchmarks[i]->executed_loops[ 1 ] );
     }
 
     run_longitudinal_batches( &job, TEARDOWN );

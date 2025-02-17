@@ -124,14 +124,15 @@ test_xrstor( void ){
 
 
 void
-run_xrstor( struct benchmark_config *b ){
-
+run_xrstor( struct benchmark_config *b, size_t tid ){
+    uint64_t accumulator = 0;
     // FIXME not thread safe
     while( ! (*(b->halt)) ){
         _mm256_zeroall(); 		                        // Zeros YMM0-YMM15.
         _xrstor64( b->benchmark_addr, XSAVE_MASK );     // Flash YMM0-YMM15
-        b->executed_loops++;
+        accumulator++;
     }
+    b->executed_loops[0][tid] += accumulator;
 }
 
 void
@@ -144,7 +145,9 @@ dump_xrstor( struct job *job ){
 
     // FIXME need to iterate over threads
     for( size_t i = 0; i < job->benchmark_count; i++ ){
-        printf("# Benchmark %zu had %"PRIu64" executions.\n", i, job->benchmarks[i]->executed_loops );
+        for( size_t thread_idx = 0; thread_idx < job->benchmarks[i]->thread_count; thread_idx++ ){
+            printf("# Benchmark %zu thread %zu had %"PRIu64" executions.\n", i, thread_idx, job->benchmarks[i]->executed_loops[ 0 ][ thread_idx ] );
+        }
     }
 }
 

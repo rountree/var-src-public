@@ -47,11 +47,12 @@ struct poll_config{
 struct benchmark_config{
     benchmark_t                 benchmark_type;
     cpu_set_t                   execution_cpus;
+    size_t                      thread_count;
     char                        *benchmark_addr;    // For XRSTOR, points to the xrstor region
     uint64_t                    benchmark_param1;   // Moving to 128-bit granularity
     uint64_t                    benchmark_param2;   //  across two 64-bit unsigned ints.
     uint64_t                    benchmark_param3;
-    uint64_t                    executed_loops;
+    uint64_t                    *executed_loops[2];
     pthread_t                   *benchmark_threads;
     pthread_mutex_t             *benchmark_mutexes;
     volatile bool               *halt;
