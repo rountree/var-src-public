@@ -593,32 +593,54 @@ static void cleanup_poll_data( struct job *job ){
     }
 }
 
+static void print_execution_counts( struct job *job ){
+    printf("# benchmark_id thread_id executionA executionB\n");
+    for( size_t i = 0; i < job->benchmark_count; i++ ){
+       for( size_t thread_idx = 0; thread_idx < job->benchmarks[ i ]->thread_count; thread_idx++ ){
+          printf( "# %02zu %02zu %15"PRIu64" %15"PRIu64"\n", i, thread_idx, job->benchmarks[ i ]->executed_loops[0][ thread_idx ], job->benchmarks[ i ]->executed_loops[1][ thread_idx ] );
+       }
+    }
+}
+
+
 void dump_batches( struct job *job ){
 
-    cleanup_poll_data( job );
 
-    print_summaries( job );
 
-    print_header();
+    if( job->benchmark_count ){
+        print_execution_counts( job );
+    }
 
-    // longitudinals
-    printf( "# Dumping longitudinal batches\n");
-    for( size_t i = 0; i < job->longitudinal_count; i++ ){
-        for( longitudinal_slot_t slot_idx = 0; slot_idx < NUM_LONGITUDINAL_EXECUTION_SLOTS; slot_idx++ ){
-            if( NULL == job->longitudinals[i]->batches[ slot_idx ] ){
-                continue;
-            }
-            for( size_t op_idx = 0; op_idx < job->longitudinals[i]->batches[slot_idx]->numops; op_idx++ ){
-                print_op( &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ) );
+    if( (job->poll_count) || (job->longitudinal_count) ){
+        print_header();
+    }
+
+    if( job->longitudinal_count ){
+
+        // longitudinals
+        printf( "# Dumping longitudinal batches\n");
+        for( size_t i = 0; i < job->longitudinal_count; i++ ){
+            for( longitudinal_slot_t slot_idx = 0; slot_idx < NUM_LONGITUDINAL_EXECUTION_SLOTS; slot_idx++ ){
+                if( NULL == job->longitudinals[i]->batches[ slot_idx ] ){
+                    continue;
+                }
+                for( size_t op_idx = 0; op_idx < job->longitudinals[i]->batches[slot_idx]->numops; op_idx++ ){
+                    print_op( &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ) );
+                }
             }
         }
     }
 
-    // polls
-    printf( "# Dumping poll batches\n");
-    for( size_t i = 0; i < job->poll_count; i++ ){
-        for( size_t o = 0; o < job->polls[i]->total_ops; o++ ){
-            print_op( &(job->polls[i]->poll_ops[o]) );
+    if( job->poll_count ){
+
+        // polls
+        cleanup_poll_data( job );
+        print_summaries( job );
+        printf( "# Dumping poll batches\n");
+        for( size_t i = 0; i < job->poll_count; i++ ){
+            for( size_t o = 0; o < job->polls[i]->total_ops; o++ ){
+                print_op( &(job->polls[i]->poll_ops[o]) );
+            }
         }
     }
 }
