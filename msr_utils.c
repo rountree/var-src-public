@@ -21,13 +21,11 @@ static const char * const op2str[] = {
     [OP_WRITE]          = "WRITE",
     [OP_READ]           = "READ",
     [OP_POLL]           = "POLL",
-    [0x08]              = "UNUSED_0x08",
-    [OP_TSC_INITIAL]    = "TSC_INITIAL",
-    [OP_TSC_POLL]       = "TSC_POLL",
-    [OP_TSC_FINAL]      = "TSC_FINAL",
-    [0x80]              = "UNUSED_0x80",
-    [OP_THERM_INITIAL]  = "THERM_INITIAL",
-    [OP_THERM_FINAL]    = "THERM_FINAL"
+    [OP_MPERF]          = "MPERF",
+    [OP_APERF]          = "APERF",
+    [OP_TSC]            = "TSC",
+    [OP_THERM]          = "THERM",
+    [OP_PTHERM]         = "PTHERM"
 };
 
 static uint16_t max_msrsafe_cpu = UINT16_MAX;   // current limitation of msr-safe.
@@ -134,9 +132,9 @@ static char const *const allowlist =
                                      "0x010A 0x0000000000000000\n"      // ARCH_CAPABILTIES
                                      "0x0198 0x0000000000000000\n"      // PERF_STATUS
                                      "0x0199 0x0000000000000000\n"      // PERF_CTL
-                                     "0x019C 0x0000000000000000\n"      // THERM_STATUS
+                                     "0x019C 0x0000000000000000\n"      // THERM_STATUS         (bits 22:16 contain "Package digital temperature reading in 1 degree Celsius relative to the package TCC activation temperature." p16-46, etc.)
                                      "0x01B0 0x0000000000000000\n"      // ENERGY_PERF_BIAS
-                                     "0x01B1 0x0000000000000000\n"      // PACKAGE_THERM_STATUS
+                                     "0x01B1 0x0000000000000000\n"      // PACKAGE_THERM_STATUS (bits 22:16 contain "Package digital temperature reading in 1 degree Celsius relative to the package TCC activation temperature." p16-46, v3B, 253669-086US, Dec 2024)
                                      "0x0309 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR0
                                      "0x030A 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR1
                                      "0x030B 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR2
@@ -176,40 +174,40 @@ static constexpr const uint32_t MAX_POLL_ATTEMPTS = 10000;
 //                  u16 u16 s32 u32      u32 u64     u64   u64 u64 u64 u64 u64 u64 u64
 //                  cpu op  err poll_max msr msrdata wmask mi  mp  mf  ai  ap  af  msrdata2
 
-static constexpr const struct msr_batch_op op_zero_fixed_ctr0 = { .op = OP_WRITE | OP_TSC_INITIAL, .msr = FIXED_CTR0 };
-static constexpr const struct msr_batch_op op_zero_fixed_ctr1 = { .op = OP_WRITE | OP_TSC_INITIAL, .msr = FIXED_CTR1 };
-static constexpr const struct msr_batch_op op_zero_fixed_ctr2 = { .op = OP_WRITE | OP_TSC_INITIAL, .msr = FIXED_CTR2 };
+static constexpr const struct msr_batch_op op_zero_fixed_ctr0 = { .op = OP_WRITE | OP_TSC, .msr = FIXED_CTR0 };
+static constexpr const struct msr_batch_op op_zero_fixed_ctr1 = { .op = OP_WRITE | OP_TSC, .msr = FIXED_CTR1 };
+static constexpr const struct msr_batch_op op_zero_fixed_ctr2 = { .op = OP_WRITE | OP_TSC, .msr = FIXED_CTR2 };
 
-static constexpr const struct msr_batch_op op_read_fixed_ctr0 = { .op = OP_READ | OP_TSC_INITIAL, .msr = FIXED_CTR0 };
-static constexpr const struct msr_batch_op op_read_fixed_ctr1 = { .op = OP_READ | OP_TSC_INITIAL, .msr = FIXED_CTR1 };
-static constexpr const struct msr_batch_op op_read_fixed_ctr2 = { .op = OP_READ | OP_TSC_INITIAL, .msr = FIXED_CTR2 };
+static constexpr const struct msr_batch_op op_read_fixed_ctr0 = { .op = OP_READ | OP_TSC, .msr = FIXED_CTR0 };
+static constexpr const struct msr_batch_op op_read_fixed_ctr1 = { .op = OP_READ | OP_TSC, .msr = FIXED_CTR1 };
+static constexpr const struct msr_batch_op op_read_fixed_ctr2 = { .op = OP_READ | OP_TSC, .msr = FIXED_CTR2 };
 
 // Enable all three fixed-function performance counters, non-global
-static constexpr const struct msr_batch_op op_enable_fixed = { .op = OP_WRITE | OP_TSC_INITIAL, .msr = FIXED_CTR_CTRL, .msrdata=0x333 };
+static constexpr const struct msr_batch_op op_enable_fixed = { .op = OP_WRITE | OP_TSC, .msr = FIXED_CTR_CTRL, .msrdata=0x333 };
 
 // Enable/disable all fixed and programmable counters, global.  (Just fixed counters for now.)
-static constexpr const struct msr_batch_op op_start_global = { .op = OP_WRITE | OP_TSC_INITIAL, .msr = PERF_GLOBAL_CTRL, .msrdata=0x700000000 };
-static constexpr const struct msr_batch_op op_stop_global  = { .op = OP_WRITE | OP_TSC_INITIAL, .msr = PERF_GLOBAL_CTRL, .msrdata=0x000000000 };
+static constexpr const struct msr_batch_op op_start_global = { .op = OP_WRITE | OP_TSC, .msr = PERF_GLOBAL_CTRL, .msrdata=0x700000000 };
+static constexpr const struct msr_batch_op op_stop_global  = { .op = OP_WRITE | OP_TSC, .msr = PERF_GLOBAL_CTRL, .msrdata=0x000000000 };
 
 // Polling instructions.  C and F need some attention.
-static constexpr const struct msr_batch_op op_poll_pkg_J = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = PKG_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
-static constexpr const struct msr_batch_op op_poll_pp0_J = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = PP0_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
-static constexpr const struct msr_batch_op op_poll_pp1_J = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = PP1_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
-static constexpr const struct msr_batch_op op_poll_dram_J ={ .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL | OP_THERM_INITIAL | OP_THERM_FINAL, .msr = DRAM_ENERGY_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_pkg_J = { .op = OP_POLL | OP_ALL_MODS, .msr = PKG_ENERGY_STATUS,    .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_pp0_J = { .op = OP_POLL | OP_ALL_MODS, .msr = PP0_ENERGY_STATUS,    .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_pp1_J = { .op = OP_POLL | OP_ALL_MODS, .msr = PP1_ENERGY_STATUS,    .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_dram_J= { .op = OP_POLL | OP_ALL_MODS, .msr = DRAM_ENERGY_STATUS,   .poll_max=MAX_POLL_ATTEMPTS };
 
-static constexpr const struct msr_batch_op op_poll_pkg_C = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = PACKAGE_THERM_STATUS,      .poll_max=MAX_POLL_ATTEMPTS };
-static constexpr const struct msr_batch_op op_poll_core_C = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = THERM_STATUS,      .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_pkg_C = { .op = OP_POLL | OP_ALL_MODS, .msr = PACKAGE_THERM_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_core_C= { .op = OP_POLL | OP_ALL_MODS, .msr = THERM_STATUS,         .poll_max=MAX_POLL_ATTEMPTS };
 
 
-static constexpr const struct msr_batch_op op_poll_pkg_F = { .op = OP_POLL | OP_TSC_INITIAL | OP_TSC_FINAL | OP_TSC_POLL, .msr = PERF_STATUS,       .poll_max=MAX_POLL_ATTEMPTS };
+static constexpr const struct msr_batch_op op_poll_pkg_F = { .op = OP_POLL | OP_ALL_MODS, .msr = PERF_STATUS,          .poll_max=MAX_POLL_ATTEMPTS };
 
 // Single-read energy instructions.
-static constexpr const struct msr_batch_op op_rd_RAPL_POWER_UNIT         = { .op = OP_READ | OP_TSC_INITIAL, .msr = RAPL_POWER_UNIT };
-static constexpr const struct msr_batch_op op_rd_PKG_ENERGY_STATUS       = { .op = OP_READ | OP_TSC_INITIAL, .msr = PKG_ENERGY_STATUS };
-static constexpr const struct msr_batch_op op_rd_DRAM_ENERGY_STATUS      = { .op = OP_READ | OP_TSC_INITIAL, .msr = DRAM_ENERGY_STATUS };
-static constexpr const struct msr_batch_op op_rd_PP0_ENERGY_STATUS       = { .op = OP_READ | OP_TSC_INITIAL, .msr = PP0_ENERGY_STATUS };
-static constexpr const struct msr_batch_op op_rd_PP1_ENERGY_STATUS       = { .op = OP_READ | OP_TSC_INITIAL, .msr = PP1_ENERGY_STATUS };
-static constexpr const struct msr_batch_op op_rd_PLATFORM_ENERGY_COUNTER = { .op = OP_READ | OP_TSC_INITIAL, .msr = PLATFORM_ENERGY_COUNTER };
+static constexpr const struct msr_batch_op op_rd_RAPL_POWER_UNIT         = { .op = OP_READ | OP_ALL_MODS, .msr = RAPL_POWER_UNIT };
+static constexpr const struct msr_batch_op op_rd_PKG_ENERGY_STATUS       = { .op = OP_READ | OP_ALL_MODS, .msr = PKG_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_DRAM_ENERGY_STATUS      = { .op = OP_READ | OP_ALL_MODS, .msr = DRAM_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_PP0_ENERGY_STATUS       = { .op = OP_READ | OP_ALL_MODS, .msr = PP0_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_PP1_ENERGY_STATUS       = { .op = OP_READ | OP_ALL_MODS, .msr = PP1_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_PLATFORM_ENERGY_COUNTER = { .op = OP_READ | OP_ALL_MODS, .msr = PLATFORM_ENERGY_COUNTER };
 
 //////////////////////////////////////////////////////////////////////////////////
 // Working around C initialization limitations
@@ -263,7 +261,6 @@ static const struct msr_batch_op * const * const * const longitudinal_recipes[ N
 
 
 void teardown_msrsafe_batches( struct job *job ){
-
     // Polls are easy.
     for( size_t i = 0; i < job->poll_count; i++ ){
         free( job->polls[i]->poll_batches );
@@ -282,6 +279,7 @@ void teardown_msrsafe_batches( struct job *job ){
 }
 
 static void setup_polling_batches( struct job *job ){
+
     // Map the polling batches
     for( size_t i = 0; i < job->poll_count; i++ ){
         // Assume msrs being polled will be updated 1k times/second.
@@ -340,7 +338,6 @@ static void setup_polling_batches( struct job *job ){
 static void setup_longitudinal_batches( struct job *job ){
 
     // Map the longitudinal functions we're using onto msr-safe batches.
-
     static bool initialized;
     static size_t ops_per_function_per_slot[ NUM_LONGITUDINAL_FUNCTIONS ][ NUM_LONGITUDINAL_EXECUTION_SLOTS ];
 
@@ -399,11 +396,13 @@ static void setup_longitudinal_batches( struct job *job ){
 }
 
 void setup_msrsafe_batches( struct job *job ){
+
     setup_polling_batches( job );
     setup_longitudinal_batches( job );
 }
 
 void populate_allowlist( void ) {
+
     // Keep it manual.
     int fd = open("/dev/cpu/msr_allowlist", O_WRONLY);
     assert(-1 != fd);
@@ -489,13 +488,13 @@ static void print_op( struct msr_batch_op *o ){
     printf("%#"PRIx32" ", (uint32_t)o->poll_max);
     printf("%#"PRIx32" ", (uint32_t)o->msr);
     printf("%#012"PRIx64" ", (uint64_t)o->msrdata);
-    printf("%#"PRIx64" ", (uint64_t)o->wmask);
-    printf("%#"PRIx64" ", (uint64_t)o->tsc_initial);
-    printf("%#"PRIx64" ", (uint64_t)o->tsc_poll);
-    printf("%#"PRIx64" ", (uint64_t)o->tsc_final);
     printf("%#"PRIx64" ", (uint64_t)o->msrdata2);
-    printf("%#"PRIx64" ", (uint64_t)o->therm_initial);
-    printf("%#"PRIx64" ", (uint64_t)o->therm_final);
+    printf("%#"PRIx64" ", (uint64_t)o->wmask);
+    printf("%#"PRIx64" ", (uint64_t)o->tsc);
+    printf("%#"PRIx64" ", (uint64_t)o->aperf);
+    printf("%#"PRIx64" ", (uint64_t)o->mperf);
+    printf("%#"PRIx64" ", (uint64_t)o->therm);
+    printf("%#"PRIx64" ", (uint64_t)o->ptherm);
 
     printf("# ");
 
@@ -538,11 +537,11 @@ static void print_summaries( struct job *job ){
                     job->polls[i]->poll_ops[o].msrdata - job->polls[i]->poll_ops[0].msrdata );
         }
         printf( "# SUMMARY delta tsc     = %llu\n",
-                job->polls[i]->poll_ops[o].tsc_final - job->polls[i]->poll_ops[0].tsc_initial );
+                job->polls[i]->poll_ops[o].tsc - job->polls[i]->poll_ops[0].tsc);
         printf( "# SUMMARY initial C     = %llu\n",
-                EXTRACT_TEMPERATURE( job->polls[i]->poll_ops[0].therm_initial ) );
+                EXTRACT_TEMPERATURE( job->polls[i]->poll_ops[0].therm) );
         printf( "# SUMMARY final C       = %llu\n",
-                EXTRACT_TEMPERATURE( job->polls[i]->poll_ops[o].therm_final ) );
+                EXTRACT_TEMPERATURE( job->polls[i]->poll_ops[o].therm) );
 
     }
 }
@@ -582,11 +581,11 @@ static void cleanup_poll_data( struct job *job ){
 
     for( size_t i = 0; i < job->poll_count; i++ ){
         for( size_t b = 0; b < job->polls[i]->total_ops; b++ ){
-            if( job->polls[i]->poll_ops[b].op & OP_THERM_INITIAL ){
-                job->polls[i]->poll_ops[b].therm_initial = (job->polls[i]->poll_ops[b].therm_initial >> 16) & 0x7f;
+            if( job->polls[i]->poll_ops[b].op & OP_THERM ){
+                job->polls[i]->poll_ops[b].therm = (job->polls[i]->poll_ops[b].therm >> 16) & 0x7f;
             }
-            if( job->polls[i]->poll_ops[b].op & OP_THERM_FINAL ){
-                job->polls[i]->poll_ops[b].therm_final = (job->polls[i]->poll_ops[b].therm_final >> 16) & 0x7f;
+            if( job->polls[i]->poll_ops[b].op & OP_PTHERM ){
+                job->polls[i]->poll_ops[b].ptherm = (job->polls[i]->poll_ops[b].ptherm >> 16) & 0x7f;
             }
             job->polls[i]->poll_ops[b].wmask =  job->polls[i]->poll_ops[b].op >> 12;
         }
