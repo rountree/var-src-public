@@ -9,6 +9,7 @@
 #include <stdio.h>          // printf(3), perror(3)
 #include <sys/ioctl.h>      // ioctl(2)
 #include <errno.h>          // errno
+#define MSR_SAFE_USERSPACE  // Pick up some typedefs and enums useful for printing ops
 #include "msr_safe.h"       // struct msr_batch_array, struct msr_batch_op, X86_IOC_MSR_BATCH
 #include "msr_version.h"    // MSR_SAFE_VERSION_u32
 #include "cpuset_utils.h"   // get_next_cpu()
@@ -17,64 +18,57 @@
 #define EXTRACT_TEMPERATURE(x) ( (x>>16) & 0x7fULL )
 #define UNUSED_OP ((__s32)(0xDECAFBAD))
 
-static const char * const op2str[] = {
-    [OP_WRITE]          = "WRITE",
-    [OP_READ]           = "READ",
-    [OP_POLL]           = "POLL",
-    [OP_MPERF]          = "MPERF",
-    [OP_APERF]          = "APERF",
-    [OP_TSC]            = "TSC",
-    [OP_THERM]          = "THERM",
-    [OP_PTHERM]         = "PTHERM"
-};
-
 static uint16_t max_msrsafe_cpu = UINT16_MAX;   // current limitation of msr-safe.
 
 //////////////////////////////////////////////////////////////////////////////////
 // List of MSRs
 //////////////////////////////////////////////////////////////////////////////////
-static constexpr const uint32_t  TIME_STAMP_COUNTER               = 0x0010;
-static constexpr const uint32_t  MISC_PACKAGE_CTLS                = 0x00BC;
-static constexpr const uint32_t  MPERF                            = 0x00E7;
-static constexpr const uint32_t  APERF                            = 0x00E8;
-static constexpr const uint32_t  ARCH_CAPABILTIES                 = 0x010A;
-static constexpr const uint32_t  PERF_STATUS                      = 0x0198;
-static constexpr const uint32_t  PERF_CTL                         = 0x0199;
-static constexpr const uint32_t  THERM_STATUS                     = 0x019C; // 22:16 Degrees C away from max
-static constexpr const uint32_t  ENERGY_PERF_BIAS                 = 0x01B0;
-static constexpr const uint32_t  PACKAGE_THERM_STATUS             = 0x01B1; // 22:16 Degrees C away from max
-static constexpr const uint32_t  FIXED_CTR0                       = 0x0309; // INST_RETIRED.ANY
-static constexpr const uint32_t  FIXED_CTR1                       = 0x030A; // CPU_CLK_UNHALTED.[THREAD|CORE]
-static constexpr const uint32_t  FIXED_CTR2                       = 0x030B; // CPU_CLK_UNHALTED.REF_TSC
-static constexpr const uint32_t  FIXED_CTR3                       = 0x030C;
-static constexpr const uint32_t  FIXED_CTR_CTRL                   = 0x038D;
-static constexpr const uint32_t  PERF_GLOBAL_CTRL                 = 0x038F;
-static constexpr const uint32_t  RAPL_POWER_UNIT                  = 0x0606;
-static constexpr const uint32_t  PKG_POWER_LIMIT                  = 0x0610;
-static constexpr const uint32_t  PKG_ENERGY_STATUS                = 0x0611;
-static constexpr const uint32_t  PACKAGE_ENERGY_TIME_STATUS       = 0x0612;
-static constexpr const uint32_t  PKG_PERF_STATUS                  = 0x0613;
-static constexpr const uint32_t  PKG_POWER_INFO                   = 0x0614;
-static constexpr const uint32_t  DRAM_PWER_LIMIT                  = 0x0618;
-static constexpr const uint32_t  DRAM_ENERGY_STATUS               = 0x0619;
-static constexpr const uint32_t  DRAM_PERF_STATUS                 = 0x061B;
-static constexpr const uint32_t  DRAM_POWER_INFO                  = 0x061C;
-static constexpr const uint32_t  PP0_POWER_LIMIT                  = 0x0638;
-static constexpr const uint32_t  PP0_ENERGY_STATUS                = 0x0639;
-static constexpr const uint32_t  PP0_POLICY                       = 0x063A;
-static constexpr const uint32_t  PP1_POWER_LIMIT                  = 0x0640;
-static constexpr const uint32_t  PP1_ENERGY_STATUS                = 0x0641;
-static constexpr const uint32_t  PP1_POLICY                       = 0x0642;
-static constexpr const uint32_t  PLATFORM_ENERGY_COUNTER          = 0x064D;
-static constexpr const uint32_t  PPERF                            = 0x064E;
-static constexpr const uint32_t  PLATFORM_POWER_INFO              = 0x0665;
-static constexpr const uint32_t  PLATFORM_POWER_LIMIT             = 0x065C;
-static constexpr const uint32_t  PLATFORM_RAPL_SOCKET_PERF_STATUS = 0x0666;
-static constexpr const uint32_t  PM_ENABLE                        = 0x0770;
-static constexpr const uint32_t  HWP_CAPABILITIES                 = 0x0771;
+typedef enum : uint64_t{
+    TIME_STAMP_COUNTER               = 0x0010,
+    MISC_PACKAGE_CTLS                = 0x00BC,
+    MPERF                            = 0x00E7,
+    APERF                            = 0x00E8,
+    ARCH_CAPABILTIES                 = 0x010A,
+    PERF_STATUS                      = 0x0198,
+    PERF_CTL                         = 0x0199,
+    THERM_STATUS                     = 0x019C, // 22:16 Degrees C away from max
+    ENERGY_PERF_BIAS                 = 0x01B0,
+    PACKAGE_THERM_STATUS             = 0x01B1, // 22:16 Degrees C away from max
+    FIXED_CTR0                       = 0x0309, // INST_RETIRED.ANY
+    FIXED_CTR1                       = 0x030A, // CPU_CLK_UNHALTED.[THREAD|CORE]
+    FIXED_CTR2                       = 0x030B, // CPU_CLK_UNHALTED.REF_TSC
+    FIXED_CTR3                       = 0x030C,
+    FIXED_CTR_CTRL                   = 0x038D,
+    PERF_GLOBAL_CTRL                 = 0x038F,
+    RAPL_POWER_UNIT                  = 0x0606,
+    PKG_POWER_LIMIT                  = 0x0610,
+    PKG_ENERGY_STATUS                = 0x0611,
+    PACKAGE_ENERGY_TIME_STATUS       = 0x0612,
+    PKG_PERF_STATUS                  = 0x0613,
+    PKG_POWER_INFO                   = 0x0614,
+    DRAM_PWER_LIMIT                  = 0x0618,
+    DRAM_ENERGY_STATUS               = 0x0619,
+    DRAM_PERF_STATUS                 = 0x061B,
+    DRAM_POWER_INFO                  = 0x061C,
+    PP0_POWER_LIMIT                  = 0x0638,
+    PP0_ENERGY_STATUS                = 0x0639,
+    PP0_POLICY                       = 0x063A,
+    PP1_POWER_LIMIT                  = 0x0640,
+    PP1_ENERGY_STATUS                = 0x0641,
+    PP1_POLICY                       = 0x0642,
+    PLATFORM_ENERGY_COUNTER          = 0x064D,
+    PPERF                            = 0x064E,
+    PLATFORM_POWER_INFO              = 0x0665,
+    PLATFORM_POWER_LIMIT             = 0x065C,
+    PLATFORM_RAPL_SOCKET_PERF_STATUS = 0x0666,
+    PM_ENABLE                        = 0x0770,
+    HWP_CAPABILITIES                 = 0x0771,
+}msr_t;
 
 // This wastes an extravagant amount of memory if the compiler isn't optimizing
 // based on the double const.  Use constexpr?
+#if 0
+This should be coming out of an msr header file.
 static const char * const msr2str[] = {
        [TIME_STAMP_COUNTER]                = "TIME_STAMP_COUNTER",
        [MISC_PACKAGE_CTLS]                 = "MISC_PACKAGE_CTLS",
@@ -116,64 +110,61 @@ static const char * const msr2str[] = {
        [PM_ENABLE]                         = "PM_ENABLE",
        [HWP_CAPABILITIES]                  = "HWP_CAPABILITIES",
 };
-
+#endif
 
 //////////////////////////////////////////////////////////////////////////////////
 // Allowlist.
 //////////////////////////////////////////////////////////////////////////////////
 static char const *const allowlist =
-                                    // Polling MSRs (TBD)
+    // Polling MSRs (incomplete)
+    "0x0639 0x0000000000000000\n"      // PP0_ENERGY_STATUS
+    "0x0611 0x0000000000000000\n"      // PKG_ENERGY_STATUS
+    "0x0619 0x0000000000000000\n"      // DRAM_ENERGY_STATUS
+    "0x0641 0x0000000000000000\n"      // PP1_ENERGY_STATUS
 
-                                    // Everything else
-                                     "0x0010 0x0000000000000000\n"      // TIME_STAMP_COUNTER
-                                     "0x00BC 0x0000000000000000\n"      // MISC_PACKAGE_CTLS
-                                     "0x00E7 0x0000000000000000\n"      // MPERF
-                                     "0x00E8 0x0000000000000000\n"      // APERF
-                                     "0x010A 0x0000000000000000\n"      // ARCH_CAPABILTIES
-                                     "0x0198 0x0000000000000000\n"      // PERF_STATUS
-                                     "0x0199 0x0000000000000000\n"      // PERF_CTL
-                                     "0x019C 0x0000000000000000\n"      // THERM_STATUS         (bits 22:16 contain "Package digital temperature reading in 1 degree Celsius relative to the package TCC activation temperature." p16-46, etc.)
-                                     "0x01B0 0x0000000000000000\n"      // ENERGY_PERF_BIAS
-                                     "0x01B1 0x0000000000000000\n"      // PACKAGE_THERM_STATUS (bits 22:16 contain "Package digital temperature reading in 1 degree Celsius relative to the package TCC activation temperature." p16-46, v3B, 253669-086US, Dec 2024)
-                                     "0x0309 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR0
-                                     "0x030A 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR1
-                                     "0x030B 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR2
-                                     "0x030C 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR3
-                                     "0x038D 0x0000000000000333\n"      // FIXED_CTR_CTRL
-                                     "0x038F 0x0000000700000000\n"      // PERF_GLOBAL_CTRL
-                                     "0x0606 0x0000000000000000\n"      // RAPL_POWER_UNIT
-                                     "0x0610 0x0000000000000000\n"      // PKG_POWER_LIMIT
-                                     "0x0611 0x0000000000000000\n"      // PKG_ENERGY_STATUS
-                                     "0x0612 0x0000000000000000\n"      // PACKAGE_ENERGY_TIME_STATUS
-                                     "0x0613 0x0000000000000000\n"      // PKG_PERF_STATUS
-                                     "0x0614 0x0000000000000000\n"      // PKG_POWER_INFO
-                                     "0x0618 0x0000000000000000\n"      // DRAM_PWER_LIMIT
-                                     "0x0619 0x0000000000000000\n"      // DRAM_ENERGY_STATUS
-                                     "0x061B 0x0000000000000000\n"      // DRAM_PERF_STATUS
-                                     "0x061C 0x0000000000000000\n"      // DRAM_POWER_INFO
-                                     "0x0638 0x0000000000000000\n"      // PP0_POWER_LIMIT
-                                     "0x0639 0x0000000000000000\n"      // PP0_ENERGY_STATUS
-                                     "0x063A 0x0000000000000000\n"      // PP0_POLICY
-                                     "0x0640 0x0000000000000000\n"      // PP1_POWER_LIMIT
-                                     "0x0641 0x0000000000000000\n"      // PP1_ENERGY_STATUS
-                                     "0x0642 0x0000000000000000\n"      // PP1_POLICY
-                                     "0x064D 0x0000000000000000\n"      // PLATFORM_ENERGY_COUNTER
-                                     "0x064E 0x0000000000000000\n"      // PPERF
-                                     "0x0665 0x0000000000000000\n"      // PLATFORM_POWER_INFO
-                                     "0x065C 0x0000000000000000\n"      // PLATFORM_POWER_LIMIT
-                                     "0x0666 0x0000000000000000\n"      // PLATFORM_RAPL_SOCKET_PERF_STATUS
-                                     "0x0770 0x0000000000000000\n"      // PM_ENABLE
-                                     "0x0771 0x0000000000000000\n"      // HWP_CAPABILITIES
-                                     ;
+    // Everything else
+    "0x0010 0x0000000000000000\n"      // TIME_STAMP_COUNTER
+    "0x00BC 0x0000000000000000\n"      // MISC_PACKAGE_CTLS
+    "0x00E7 0x0000000000000000\n"      // MPERF
+    "0x00E8 0x0000000000000000\n"      // APERF
+    "0x010A 0x0000000000000000\n"      // ARCH_CAPABILTIES
+    "0x0198 0x0000000000000000\n"      // PERF_STATUS
+    "0x0199 0x0000000000000000\n"      // PERF_CTL
+    "0x019C 0x0000000000000000\n"      // THERM_STATUS         (bits 22:16 contain "Package digital temperature reading in 1 degree Celsius relative to the package TCC activation temperature." p16-46, etc.)
+    "0x01B0 0x0000000000000000\n"      // ENERGY_PERF_BIAS
+    "0x01B1 0x0000000000000000\n"      // PACKAGE_THERM_STATUS (bits 22:16 contain "Package digital temperature reading in 1 degree Celsius relative to the package TCC activation temperature." p16-46, v3B, 253669-086US, Dec 2024)
+    "0x0309 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR0
+    "0x030A 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR1
+    "0x030B 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR2
+    "0x030C 0xFFFFFFFFFFFFFFFF\n"      // FIXED_CTR3
+    "0x038D 0x0000000000000333\n"      // FIXED_CTR_CTRL
+    "0x038F 0x0000000700000000\n"      // PERF_GLOBAL_CTRL
+    "0x0606 0x0000000000000000\n"      // RAPL_POWER_UNIT
+    "0x0610 0x0000000000000000\n"      // PKG_POWER_LIMIT
+    "0x0612 0x0000000000000000\n"      // PACKAGE_ENERGY_TIME_STATUS
+    "0x0613 0x0000000000000000\n"      // PKG_PERF_STATUS
+    "0x0614 0x0000000000000000\n"      // PKG_POWER_INFO
+    "0x0618 0x0000000000000000\n"      // DRAM_POWER_LIMIT
+    "0x061B 0x0000000000000000\n"      // DRAM_PERF_STATUS
+    "0x061C 0x0000000000000000\n"      // DRAM_POWER_INFO
+    "0x0638 0x0000000000000000\n"      // PP0_POWER_LIMIT
+    "0x063A 0x0000000000000000\n"      // PP0_POLICY
+    "0x0640 0x0000000000000000\n"      // PP1_POWER_LIMIT
+    "0x0642 0x0000000000000000\n"      // PP1_POLICY
+    "0x064D 0x0000000000000000\n"      // PLATFORM_ENERGY_COUNTER
+    "0x064E 0x0000000000000000\n"      // PPERF
+    "0x0665 0x0000000000000000\n"      // PLATFORM_POWER_INFO
+    "0x065C 0x0000000000000000\n"      // PLATFORM_POWER_LIMIT
+    "0x0666 0x0000000000000000\n"      // PLATFORM_RAPL_SOCKET_PERF_STATUS
+    "0x0770 0x0000000000000000\n"      // PM_ENABLE
+    "0x0771 0x0000000000000000\n"      // HWP_CAPABILITIES
+    ;
 
 static constexpr const uint32_t MAX_POLL_ATTEMPTS = 10000;
 
 //////////////////////////////////////////////////////////////////////////////////
 // Available ops.
 //////////////////////////////////////////////////////////////////////////////////
-//                  u16 u16 s32 u32      u32 u64     u64   u64 u64 u64 u64 u64 u64 u64
-//                  cpu op  err poll_max msr msrdata wmask mi  mp  mf  ai  ap  af  msrdata2
-
 static constexpr const struct msr_batch_op op_zero_fixed_ctr0 = { .op = OP_WRITE | OP_TSC, .msr = FIXED_CTR0 };
 static constexpr const struct msr_batch_op op_zero_fixed_ctr1 = { .op = OP_WRITE | OP_TSC, .msr = FIXED_CTR1 };
 static constexpr const struct msr_batch_op op_zero_fixed_ctr2 = { .op = OP_WRITE | OP_TSC, .msr = FIXED_CTR2 };
@@ -420,84 +411,74 @@ void populate_allowlist( void ) {
 }
 
 
-static void print_header( void ){
-    printf("cpu "
-            "op "
-            "err "
-            "poll_max "
-            "msr "
-            "msrdata "
-            "wmask "
-            "tsc_initial "
-            "tsc_poll "
-            "tsc_final "
-            "msrdata2 "
-            "therm_initial "
-            "therm_final "
-            "\n");
-
-    printf("#c "
-            "o "
-            "e "
-            "pm "
-            "msr "
-            "val "
-            "wmask "
-            "tsci "
-            "tscp "
-            "tscf "
-            "val2 "
-            "ti "
-            "tf "
-            "\n");
+static void print_header( int fd, uint64_t op_bitfield ){
+    static bool is_first = true;
+    if( 0 == op_bitfield ){
+        dprintf( fd, "# No column headers requested\n");
+    }else{
+        for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
+            if( op_bitfield & ( 1 >> arridx ) ){
+                dprintf( fd, is_first ? "%s" : " %s", opfield2str[ arridx ] );
+                is_first = false;
+            }
+        }
+        dprintf( fd, "\n" );
+    }
+    return;
 }
 
-static void print_op( struct msr_batch_op *o ){
+static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, struct msr_batch_op *prev, bool skip_unused ){
 
-#if 0
-    static uint64_t previous_pkg_energy_status_value;
-    static uint64_t accumulated_pkg_energy_status_rollover;
-    const uint64_t ENERGY_ROLLOVER_OFFSET = 0x100000000;
-    This is supposed to happen in the thread, not here
-    // Only handle rollover for polls for now.
-    if( o->op & OP_POLL ){
-        if( o->msr == PKG_ENERGY_STATUS ){
-            o->msrdata += accumulated_pkg_energy_status_rollover;
-            o->msrdata2 += accumulated_pkg_energy_status_rollover;
-            // If the msrdata pkg_energy_status value rolled over, assume the msrdata2 value cannot
-            // within the same sample.
-            if( o->msrdata < previous_pkg_energy_status_value ){
-                o->msrdata  += ENERGY_ROLLOVER_OFFSET;
-                o->msrdata2 += ENERGY_ROLLOVER_OFFSET;
-                accumulated_pkg_energy_status_rollover += ENERGY_ROLLOVER_OFFSET;
+    if( ( o->err == UNUSED_OP ) && skip_unused ){
+        return;
+    }
+
+    static bool is_first = true;    // Add a leading space to all but the first field
+    if( 0 == op_bitfield ){
+        dprintf( fd, "# No column headers requested\n");
+    }else{
+        for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
+            if( op_bitfield & ( 1 >> arridx ) ){
+                // extra leading space for all but the first value
+                if( !is_first ){
+                    dprintf( fd, " " );
+                    is_first = false;
+                }
+                // print out the formatted value
+                // casting required because the kernel's _u64 is not quite the same time as uint64_t
+                // (unsigned long vs unsigned long long, I think, though I forget which was which)
+                switch( arridx ){
+                    case op_field_arridx_CPU:           dprintf( fd, "%#"PRIx16, (uint16_t)(o->cpu) );          break;
+                    case op_field_arridx_OP:            dprintf( fd, "%#"PRIx16, (uint16_t)(o->op) );           break;
+                    case op_field_arridx_ERR:           dprintf( fd, "%#"PRIx32, ( int32_t)(o->err) );          break;
+                    case op_field_arridx_POLL_MAX:      dprintf( fd, "%#"PRIx32, (uint32_t)(o->poll_max) );     break;
+                    case op_field_arridx_WMASK:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->wmask) );        break;
+                    case op_field_arridx_MSR:           dprintf( fd, "%#"PRIx32, (uint32_t)(o->msr) );          break;
+                    case op_field_arridx_MSRDATA:       dprintf( fd, "%#"PRIx64, (uint64_t)(o->msrdata) );      break;
+                    case op_field_arridx_MSRDATA2:      dprintf( fd, "%#"PRIx64, (uint64_t)(o->msrdata2) );     break;
+                    case op_field_arridx_TSC:           dprintf( fd, "%#"PRIx64, (uint64_t)(o->tsc) );          break;
+                    case op_field_arridx_MPERF:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->mperf) );        break;
+                    case op_field_arridx_APERF:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->aperf) );        break;
+                    case op_field_arridx_THERM:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->therm) );        break;
+                    case op_field_arridx_PTHERM:        dprintf( fd, "%#"PRIx64, (uint64_t)(o->ptherm) );       break;
+                    case op_field_arridx_TAG:           dprintf( fd, "%#"PRIx64, (uint64_t)(o->tag) );          break;
+                    case op_field_arridx_DELTA_MPERF:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->mperf   - prev->mperf   ) ); } break;
+                    case op_field_arridx_DELTA_APERF:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->aperf   - prev->aperf   ) ); } break;
+                    case op_field_arridx_DELTA_TSC:     if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->tsc     - prev->tsc     ) ); } break;
+                    case op_field_arridx_DELTA_THERM:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->therm   - prev->therm   ) ); } break;
+                    case op_field_arridx_DELTA_PTHERM:  if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->ptherm  - prev->ptherm  ) ); } break;
+                    case op_field_arridx_DELTA_MSRDATA: if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->msrdata - prev->msrdata ) ); } break;
+                    default:
+                        fprintf( stderr, "%s:%d:%s Unknown value for arridx:  %#"PRIx64"\n", __FILE__, __LINE__, __func__, arridx );
+                        assert(0);
+                        break;
+                }
             }
-            // Rolloever happened during polling.
-            else if( o->msrdata2 < o->msrdata ){
-                o->msrdata2 += ENERGY_ROLLOVER_OFFSET;
-                accumulated_pkg_energy_status_rollover += ENERGY_ROLLOVER_OFFSET;
-            }
-            previous_pkg_energy_status_value = o->msrdata2;
         }
     }
-#endif
-    // All this can be stuffed into a single printf(), and I have done that several times, and
-    // it's a pain to debug.  Doubt this will be noticably slower.
-    printf("%#"PRIx16" ", (uint16_t)o->cpu);
-    printf("%#"PRIx16" ", (uint16_t)o->op);
-    printf("%#"PRIx32" ", ( int32_t)o->err);
-    printf("%#"PRIx32" ", (uint32_t)o->poll_max);
-    printf("%#"PRIx32" ", (uint32_t)o->msr);
-    printf("%#012"PRIx64" ", (uint64_t)o->msrdata);
-    printf("%#"PRIx64" ", (uint64_t)o->msrdata2);
-    printf("%#"PRIx64" ", (uint64_t)o->wmask);
-    printf("%#"PRIx64" ", (uint64_t)o->tsc);
-    printf("%#"PRIx64" ", (uint64_t)o->aperf);
-    printf("%#"PRIx64" ", (uint64_t)o->mperf);
-    printf("%#"PRIx64" ", (uint64_t)o->therm);
-    printf("%#"PRIx64" ", (uint64_t)o->ptherm);
+    return;
 
-    printf("# ");
-
+#if 0
     printf("%s ", msr2str[ o->msr ]);
     uint16_t op = o->op;
     for( size_t op_idx = 0; 1 << op_idx <= MAX_OP_VAL ; op_idx++ ){
@@ -505,6 +486,7 @@ static void print_op( struct msr_batch_op *o ){
             printf("%s ", op2str[ 1 << op_idx ] );
         }
     }
+#endif
     printf("\n");
 }
 
@@ -604,14 +586,8 @@ static void print_execution_counts( struct job *job ){
 
 void dump_batches( struct job *job ){
 
-
-
     if( job->benchmark_count ){
         print_execution_counts( job );
-    }
-
-    if( (job->poll_count) || (job->longitudinal_count) ){
-        print_header();
     }
 
     if( job->longitudinal_count ){
@@ -623,9 +599,23 @@ void dump_batches( struct job *job ){
                 if( NULL == job->longitudinals[i]->batches[ slot_idx ] ){
                     continue;
                 }
-                for( size_t op_idx = 0; op_idx < job->longitudinals[i]->batches[slot_idx]->numops; op_idx++ ){
-                    print_op( &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ) );
+                static char filename[2048];
+                snprintf( filename, 2047, "./longitudinal_%zu_%s_%s.out",
+                        i,
+                        longitudinaltype2str[ job->longitudinals[i]->longitudinal_type ],
+                        longitudinalslot2str[ slot_idx ] );
+                int fd = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
+                if( fd < 0 ){
+                    perror("");
+                    fprintf( stderr, "%s:%d:%s Error opening file %s.  Bye!\n", __FILE__, __LINE__, __func__, filename );
+                    exit(-1);
                 }
+                print_header( fd,op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC);
+                for( size_t op_idx = 0; op_idx < job->longitudinals[i]->batches[slot_idx]->numops; op_idx++ ){
+                    print_op( fd, op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC,
+                            &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ), NULL, true);
+                }
+                close( fd );
             }
         }
     }
@@ -637,8 +627,31 @@ void dump_batches( struct job *job ){
         print_summaries( job );
         printf( "# Dumping poll batches\n");
         for( size_t i = 0; i < job->poll_count; i++ ){
-            for( size_t o = 0; o < job->polls[i]->total_ops; o++ ){
-                print_op( &(job->polls[i]->poll_ops[o]) );
+
+            // Open up a bunch of files.
+            static char filename[2048];
+            int fd[ op_field_arridx_MAX_IDX ];
+            for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
+                snprintf( filename, 2047, "./poll_%zu_%s_%s.out", i, polltype2str[ job->polls[i]->poll_type ], opfield2str[ arridx ]);
+                fd[ arridx ] = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
+                if( fd[ arridx ] < 0 ){
+                    perror("");
+                    fprintf( stderr, "%s:%d:%s Error opening file %s.  Bye!\n", __FILE__, __LINE__, __func__, filename );
+                    exit(-1);
+                }
+                print_header( fd[ arridx ], 1ULL << arridx );
+            }
+            // Probably faster to visit each operation once.
+            // Note that we start with the second poll value to make the deltas work.
+            assert( job->polls[i]->total_ops > 2 );
+            for( size_t o = 1; o < job->polls[i]->total_ops; o++ ){
+                for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
+                    print_op( fd[ arridx ], 1ULL << arridx, &(job->polls[i]->poll_ops[o]), &(job->polls[i]->poll_ops[ o-1 ]), true );
+                }
+            }
+            // Close a bunch of files.
+            for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
+                close( fd[ arridx ] );
             }
         }
     }

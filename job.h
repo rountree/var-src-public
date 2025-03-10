@@ -23,14 +23,8 @@ typedef enum{
     // so they contain only the msr writes necessary for starting and stopping,
     // and put the other bookkeeping in SETUP and READ/TEARDOWN.  The latter might
     // become a single slot.
-    SETUP,
-    START,
-    STOP,
-    READ,
-    TEARDOWN,
-    NUM_LONGITUDINAL_EXECUTION_SLOTS
-} longitudinal_slot_t;
-
+                                                     SETUP,   START,   STOP,   READ,   TEARDOWN, NUM_LONGITUDINAL_EXECUTION_SLOTS } longitudinal_slot_t;
+static const char * const longitudinalslot2str[] = {"SETUP", "START", "STOP", "READ", "TEARDOWN"                                  };
 
 
 struct poll_config{

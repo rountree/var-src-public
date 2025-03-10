@@ -1,3 +1,5 @@
+Verify all energy counters are handling rollover.
+
 Adding a "sample" task should be fairly straightforward, although
 routing the SIGALRM signals might be nontrival (and do we really
 want to implement an alarm scheduler?).  The obvious use is
