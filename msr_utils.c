@@ -416,8 +416,9 @@ static void print_header( int fd, uint64_t op_bitfield ){
     if( 0 == op_bitfield ){
         dprintf( fd, "# No column headers requested\n");
     }else{
+        dprintf( fd, "# bitfield for header selection is:  %#"PRIx64"\n", op_bitfield );
         for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
-            if( op_bitfield & ( 1 >> arridx ) ){
+            if( op_bitfield & ( 1 << arridx ) ){
                 dprintf( fd, is_first ? "%s" : " %s", opfield2str[ arridx ] );
                 is_first = false;
             }
@@ -434,15 +435,17 @@ static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, stru
     }
 
     static bool is_first = true;    // Add a leading space to all but the first field
+
     if( 0 == op_bitfield ){
         dprintf( fd, "# No column headers requested\n");
     }else{
         for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
-            if( op_bitfield & ( 1 >> arridx ) ){
+            if( op_bitfield & ( 1 << arridx ) ){
                 // extra leading space for all but the first value
-                if( !is_first ){
-                    dprintf( fd, " " );
+                if( is_first ){
                     is_first = false;
+                }else{
+                    dprintf( fd, " " );
                 }
                 // print out the formatted value
                 // casting required because the kernel's _u64 is not quite the same time as uint64_t
@@ -475,6 +478,7 @@ static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, stru
                 }
             }
         }
+        dprintf( fd, "\n" );
     }
     return;
 
@@ -610,10 +614,18 @@ void dump_batches( struct job *job ){
                     fprintf( stderr, "%s:%d:%s Error opening file %s.  Bye!\n", __FILE__, __LINE__, __func__, filename );
                     exit(-1);
                 }
+                fprintf( stderr, "%s:%d:%s op_field_bitidx_CPU    = %#"PRIx64"\n",     __FILE__, __LINE__, __func__, op_field_bitidx_CPU );
+                fprintf( stderr, "%s:%d:%s op_field_bitidx_ERR    = %#"PRIx64"\n",      __FILE__, __LINE__, __func__, op_field_bitidx_ERR );
+                fprintf( stderr, "%s:%d:%s op_field_bitidx_MSR    = %#"PRIx64"\n",      __FILE__, __LINE__, __func__, op_field_bitidx_MSR );
+                fprintf( stderr, "%s:%d:%s op_field_bitidx_MSRDATA= %#"PRIx64"\n",      __FILE__, __LINE__, __func__, op_field_bitidx_MSRDATA );
+                fprintf( stderr, "%s:%d:%s op_field_bitidx_TSC    = %#"PRIx64"\n",      __FILE__, __LINE__, __func__, op_field_bitidx_TSC );
+                fprintf( stderr, "%s:%d:%s                       |= %#"PRIx64"\n",      __FILE__, __LINE__, __func__, 
+                        op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC);
+
                 print_header( fd,op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC);
                 for( size_t op_idx = 0; op_idx < job->longitudinals[i]->batches[slot_idx]->numops; op_idx++ ){
                     print_op( fd, op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC,
-                            &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ), NULL, true);
+                            &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ), NULL, false);
                 }
                 close( fd );
             }
@@ -646,7 +658,7 @@ void dump_batches( struct job *job ){
             assert( job->polls[i]->total_ops > 2 );
             for( size_t o = 1; o < job->polls[i]->total_ops; o++ ){
                 for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
-                    print_op( fd[ arridx ], 1ULL << arridx, &(job->polls[i]->poll_ops[o]), &(job->polls[i]->poll_ops[ o-1 ]), true );
+                    print_op( fd[ arridx ], 1ULL << arridx, &(job->polls[i]->poll_ops[o]), &(job->polls[i]->poll_ops[ o-1 ]), false );
                 }
             }
             // Close a bunch of files.
@@ -674,6 +686,7 @@ void run_longitudinal_batches( struct job *job, longitudinal_slot_t slot_idx ){
         errno = 0;
         int rc = ioctl( fd, X86_IOC_MSR_BATCH, job->longitudinals[i]->batches[slot_idx] );
         if( 0 != rc ){
+            dump_batches( job );
             fprintf( stderr, "%s:%d:%s ioctl failed with code (%d):  %s.\n"
                              "         longitudinal batch type = %d.\n"
                              "         slot = %d.\n",
