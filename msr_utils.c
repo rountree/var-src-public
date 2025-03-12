@@ -582,21 +582,19 @@ static void cleanup_poll_data( struct job *job ){
 
 static void print_execution_counts( struct job *job ){
     static char filename[2048];
+    snprintf( filename, 2047, "./benchmarks.out" );
+    int fd = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
+    assert( fd >= 0 );
+    dprintf(fd, "benchmark_type cpu A B\n");
     for( size_t i = 0; i < job->benchmark_count; i++ ){
-        snprintf( filename, 2047, "./benchmark_%zu_%s.out", i, benchmarktype2str[ job->benchmarks[ i ]->benchmark_type ] );
-        int fd = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
-        assert( fd >= 0 );
-        dprintf(fd, "benchmark_slot benchmark_type thrd_id A B\n");
-        for( size_t thread_idx = 0; thread_idx < job->benchmarks[ i ]->thread_count; thread_idx++ ){
-            dprintf( fd, "%02zu %s %02zu %15"PRIu64" %15"PRIu64"\n",
-                i,
-                benchmarktype2str[ job->benchmarks[ i ]->benchmark_type ],
-                thread_idx,
-                job->benchmarks[ i ]->executed_loops[0][ thread_idx ],
-                job->benchmarks[ i ]->executed_loops[1][ thread_idx ] );
-        }
-        close(fd);
+        dprintf( fd, "%s %02zu %15"PRIu64" %15"PRIu64"\n",
+            i,
+            benchmarktype2str[ job->benchmarks[ i ]->benchmark_type ],
+            thread_idx,
+            job->benchmarks[ i ]->executed_loops[0],
+            job->benchmarks[ i ]->executed_loops[1] );
     }
+    close(fd);
 }
 
 

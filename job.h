@@ -9,8 +9,8 @@
 typedef enum{                                PKG_ENERGY,   PP0_ENERGY,   PP1_ENERGY,   DRAM_ENERGY,   CORE_THERMAL,   PKG_THERMAL,   FREQUENCY, NUM_POLL_TYPES} poll_t;
 static const char * const polltype2str[] = {"PKG_ENERGY", "PP0_ENERGY", "PP1_ENERGY", "DRAM_ENERGY", "CORE_THERMAL", "PKG_THERMAL", "FREQUENCY" };
 
-typedef enum{                                      SPIN,   XRSTOR,   ABSHIFT  } benchmark_t;
-static const char * const benchmarktype2str[] = { "SPIN", "XRSTOR", "ABSHIFT" };
+typedef enum{                                      SPIN,   ABSHIFT  } benchmark_t;
+static const char * const benchmarktype2str[] = { "SPIN", "ABSHIFT" };
 
 typedef enum{                                        FIXED_FUNCTION_COUNTERS,   ENERGY_COUNTERS, NUM_LONGITUDINAL_FUNCTIONS, } longitudinal_t;
 static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS", "ENERGY_COUNTERS"                             };
@@ -39,16 +39,16 @@ struct poll_config{
 };
 
 struct benchmark_config{
+    // NOTE:  There is a benchmark config per benchmark per thread.
     benchmark_t                 benchmark_type;
-    cpu_set_t                   execution_cpus;
-    size_t                      thread_count;
-    char                        *benchmark_addr;    // For XRSTOR, points to the xrstor region
+    cpu_set_t                   execution_cpus;     // FIXME should be singular
+    //size_t                      thread_count;     // FIXME not needed
     uint64_t                    benchmark_param1;   // Moving to 128-bit granularity
     uint64_t                    benchmark_param2;   //  across two 64-bit unsigned ints.
     uint64_t                    benchmark_param3;
-    uint64_t                    *executed_loops[2];
-    pthread_t                   *benchmark_threads;
-    pthread_mutex_t             *benchmark_mutexes;
+    uint64_t                    *executed_loops[2]; // FIXME I doubt this needs to be a pointer
+    pthread_t                   *benchmark_threads; // FIXME singluar, not a pointer
+    pthread_mutex_t             *benchmark_mutexes; // FIXME singular, not a pointer
     volatile bool               *halt;
     volatile bool               *ab_selector;
 };

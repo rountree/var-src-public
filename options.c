@@ -31,14 +31,7 @@ static void print_help( void ){
     printf( "  -R / --abRandomized (enables random a|b selection)\n");
     printf( "  -T / --abTime=<seconds>:<milliseconds (default is 1 second)\n");
     printf( "\n");
-    printf( "The available benchmarks are XRSTOR, SPIN, and ABSHIFT.\n");
-    printf( "  XRSTOR loads the AVX registers with the contents of a prepared memory\n");
-    printf( "  region.  The user may specify multiple <execution_cpus>, but note\n");
-    printf( "  that AVX registers may be a per-core resource, rather than per cpu.\n");
-    printf( "  <benchmark_paramN> are two 64-bit values that will be used to fill all\n");
-    printf( "  the bits in every AVX register.  XRSTOR is implemented as a tight\n");
-    printf( "  loop around the Intel Intrinsics _mm256_zeroall() and _xrstor64().\n");
-    printf( "  The loop executes until <duration> seconds have expired.\n");
+    printf( "The available benchmarks are SPIN, and ABSHIFT.\n");
     printf( "\n");
     printf( "The two valid <longitudinal_type>s are FIXED_FUNCTION_COUNTERS\n");
     printf( "  and ENERGY_COUNTERS.  With regard to the former:\n");
@@ -426,9 +419,7 @@ void parse_options( int argc, char **argv, struct job *job ){
                     assert( job->benchmarks[ bch_idx ] );
 
                     // Benchmark type
-                    if( 0 == strcmp( benchmarktype2str[XRSTOR], bch_type ) ){
-                        job->benchmarks[ bch_idx ]->benchmark_type = XRSTOR;
-                    }else if( 0 == strcmp( benchmarktype2str[SPIN], bch_type ) ){
+                    if( 0 == strcmp( benchmarktype2str[SPIN], bch_type ) ){
                         job->benchmarks[ bch_idx ]->benchmark_type = SPIN;
                     }else if( 0 == strcmp( benchmarktype2str[ABSHIFT], bch_type ) ){
                         job->benchmarks[ bch_idx ]->benchmark_type = ABSHIFT;

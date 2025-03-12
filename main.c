@@ -18,7 +18,6 @@
 #include <sys/ioctl.h>  // ioctl(2)
 #include "msr_safe.h"   // struct msr_batch_array, struct msr_batch_op, X86_IOC_MSR_BATCH
 #include "msr_version.h" //MSR_SAFE_VERSION_u32
-#include "xrstor.h"     // the xrstor benchmark
 #include "spin.h"       // the spin benchmark
 //
 // Internal header files:
@@ -89,13 +88,12 @@ void* poll_thread_start( void *v ){
 
 void* benchmark_thread_start( void *v ){
 
+    fprintf( stderr, "%s:%d:%s Initializing a thread...\n", __FILE__, __LINE__, __func__ );
     size_t benchmark_idx = (size_t)(((uint64_t)v) >> 32);
     size_t thread_idx    = (size_t)(((uint64_t)v) & 0x00000000FFFFFFFFULL );
     assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.benchmarks[ benchmark_idx ]->execution_cpus ) ) );
     assert( 0 == pthread_mutex_lock( &(job.benchmarks[ benchmark_idx ]->benchmark_mutexes[ thread_idx ]) ) );
-    if( job.benchmarks[ benchmark_idx ]->benchmark_type == XRSTOR ){
-        run_xrstor( job.benchmarks[ benchmark_idx ], thread_idx );
-    }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == SPIN ){
+    if( job.benchmarks[ benchmark_idx ]->benchmark_type == SPIN ){
         run_spin( job.benchmarks[ benchmark_idx ], thread_idx );
     }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == ABSHIFT ){
         run_abxor( job.benchmarks[ benchmark_idx ], thread_idx );
@@ -110,23 +108,16 @@ int main( int argc, char **argv ){
     parse_options( argc, argv, &job );
     populate_allowlist();
     setup_msrsafe_batches( &job );
-    test_xrstor( );
-
-    // Benchmark initialization
-    for( size_t i = 0; i < job.benchmark_count; i++ ){
-        if( job.benchmarks[ i ]->benchmark_type == XRSTOR ){
-            initialize_xrstor( job.benchmarks[ i ] );
-
-        }
-    }
 
     // Pin the main thread to the cpu requested.
     assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.main_cpu) ) );
 
     // Benchmark thread initialization
     for( uint32_t i = 0; i < job.benchmark_count; i++ ){
+        fprintf( stderr, "%s:%d:%s i=%"PRIu32", job.benchmark_count=%zu\n", __FILE__, __LINE__, __func__, i, job.benchmark_count );
         // Get the thread count via the execution_cpus cpu_set_t.
         job.benchmarks[i]->thread_count = (uint32_t)CPU_COUNT( &(job.benchmarks[i]->execution_cpus) );
+        fprintf( stderr, "%s:%d:%s job.benchmarks[%"PRIu32"]->thread_count = %zu\n", __FILE__, __LINE__, __func__, i, job.benchmarks[i]->thread_count );
 
         // Point to the global halt and ab_selector variables
         job.benchmarks[i]->halt        = &job.halt;
@@ -148,6 +139,7 @@ int main( int argc, char **argv ){
         for( uint32_t t_idx = 0; t_idx < job.benchmarks[i]->thread_count; t_idx++ ){
             assert( 0 == pthread_mutex_init( &(job.benchmarks[i]->benchmark_mutexes[t_idx]), NULL ) );
             assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutexes[t_idx]) ) );
+            fprintf( stderr, "%s:%d:%s calling pthread create, benchmarks[%"PRIu32"]->benchmark_threads[%"PRIu32"]\n", __FILE__, __LINE__, __func__, i, t_idx );
             assert( 0 == pthread_create(     &(job.benchmarks[i]->benchmark_threads[t_idx]),
                     NULL, benchmark_thread_start, (void*)( (((uint64_t)i) << 32) | t_idx ) ) );
         }
@@ -220,15 +212,11 @@ int main( int argc, char **argv ){
     run_longitudinal_batches( &job, STOP );
     run_longitudinal_batches( &job, READ );
     dump_batches( &job );
-    dump_xrstor( &job );
 
     // Benchmark thread cleanup
     for( uint32_t i = 0; i < job.benchmark_count; i++ ){
         for( uint32_t t = 0; t < (uint32_t)CPU_COUNT( &(job.benchmarks[i]->execution_cpus) ); t++ ){
             pthread_mutex_destroy( &(job.benchmarks[i]->benchmark_mutexes[t]) );
-        }
-        if( job.benchmarks[i]->benchmark_type == XRSTOR ){
-            cleanup_xrstor( job.benchmarks[i] );
         }
         free( job.benchmarks[i]->benchmark_threads );
         free( job.benchmarks[i]->benchmark_mutexes );
