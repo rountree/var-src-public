@@ -41,14 +41,13 @@ struct poll_config{
 struct benchmark_config{
     // NOTE:  There is a benchmark config per benchmark per thread.
     benchmark_t                 benchmark_type;
-    cpu_set_t                   execution_cpus;     // FIXME should be singular
-    //size_t                      thread_count;     // FIXME not needed
-    uint64_t                    benchmark_param1;   // Moving to 128-bit granularity
-    uint64_t                    benchmark_param2;   //  across two 64-bit unsigned ints.
+    cpu_set_t                   execution_cpu;
+    uint64_t                    benchmark_param1;
+    uint64_t                    benchmark_param2;
     uint64_t                    benchmark_param3;
-    uint64_t                    *executed_loops[2]; // FIXME I doubt this needs to be a pointer
-    pthread_t                   *benchmark_threads; // FIXME singluar, not a pointer
-    pthread_mutex_t             *benchmark_mutexes; // FIXME singular, not a pointer
+    uint64_t                    executed_loops[2];
+    pthread_t                   benchmark_thread;
+    pthread_mutex_t             benchmark_mutex;
     volatile bool               *halt;
     volatile bool               *ab_selector;
 };

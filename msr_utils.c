@@ -587,10 +587,9 @@ static void print_execution_counts( struct job *job ){
     assert( fd >= 0 );
     dprintf(fd, "benchmark_type cpu A B\n");
     for( size_t i = 0; i < job->benchmark_count; i++ ){
-        dprintf( fd, "%s %02zu %15"PRIu64" %15"PRIu64"\n",
-            i,
+        dprintf( fd, "%s %u %15"PRIu64" %15"PRIu64"\n",
             benchmarktype2str[ job->benchmarks[ i ]->benchmark_type ],
-            thread_idx,
+            get_next_cpu( 0, 255, &(job->benchmarks[ i ]->execution_cpu ) ),
             job->benchmarks[ i ]->executed_loops[0],
             job->benchmarks[ i ]->executed_loops[1] );
     }

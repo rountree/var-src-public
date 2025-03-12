@@ -1,5 +1,3 @@
-Verify all energy counters are handling rollover.
-
 Adding a "sample" task should be fairly straightforward, although
 routing the SIGALRM signals might be nontrival (and do we really
 want to implement an alarm scheduler?).  The obvious use is
@@ -21,8 +19,6 @@ sanitize=address and sanitize=thread
 cpuset checks don't check to see if the cpu physically exists.
 Parse /sys/devices/system/cpu?
 
-Add scrub_batch() to remove error codes (makes them reusable).
-
 Longitudinal:  CAPFREQUENCY
 
 Longitudinal:  COLDSTART
@@ -36,11 +32,6 @@ https://stackoverflow.com/questions/77850769/fatal-threadsanitizer-unexpected-me
 
 clean up makefile
 
-Write values that are potentially >32 bits as two separate 32-bit fields
-(gets around R limitation)
-
-If 0xdecafbad is in the error field, don't print the sample.
-
 Really need WAIT_UNTIL:msr:relation:value:mask:seconds
 
 Summary statistics
@@ -49,13 +40,8 @@ Add PLATFORM_ENERGY to polling
 
 Replace asserts with intelligible error messages.
 
-Verify if msr-safe is going pkg or core thermals
-
-Separate output files
-
 Update options dump
 
-Make executed_loops thread-safe
 
 
 

@@ -8,7 +8,6 @@
 #include <stdio.h>      // printf(3)
 #include <stdint.h>     // uint64_t, etc.
 #include <inttypes.h>   // PRIu64, etc.
-#include <assert.h>     // assert(3)
 #include <sys/time.h>   // time_t, suseconds_t
 #include <errno.h>      // errno
 #include <string.h>     // strlen(3), strtok_r(3), strchr(3), strncmp(3)
@@ -88,15 +87,13 @@ void* poll_thread_start( void *v ){
 
 void* benchmark_thread_start( void *v ){
 
-    fprintf( stderr, "%s:%d:%s Initializing a thread...\n", __FILE__, __LINE__, __func__ );
-    size_t benchmark_idx = (size_t)(((uint64_t)v) >> 32);
-    size_t thread_idx    = (size_t)(((uint64_t)v) & 0x00000000FFFFFFFFULL );
-    assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.benchmarks[ benchmark_idx ]->execution_cpus ) ) );
-    assert( 0 == pthread_mutex_lock( &(job.benchmarks[ benchmark_idx ]->benchmark_mutexes[ thread_idx ]) ) );
+    size_t benchmark_idx = (size_t)v;
+    assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.benchmarks[ benchmark_idx ]->execution_cpu ) ) );
+    assert( 0 == pthread_mutex_lock( &(job.benchmarks[ benchmark_idx ]->benchmark_mutex) ) );
     if( job.benchmarks[ benchmark_idx ]->benchmark_type == SPIN ){
-        run_spin( job.benchmarks[ benchmark_idx ], thread_idx );
+        run_spin( job.benchmarks[ benchmark_idx ] );
     }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == ABSHIFT ){
-        run_abxor( job.benchmarks[ benchmark_idx ], thread_idx );
+        run_abxor( job.benchmarks[ benchmark_idx ] );
     }
     return 0;
 }
@@ -113,36 +110,16 @@ int main( int argc, char **argv ){
     assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.main_cpu) ) );
 
     // Benchmark thread initialization
-    for( uint32_t i = 0; i < job.benchmark_count; i++ ){
-        fprintf( stderr, "%s:%d:%s i=%"PRIu32", job.benchmark_count=%zu\n", __FILE__, __LINE__, __func__, i, job.benchmark_count );
-        // Get the thread count via the execution_cpus cpu_set_t.
-        job.benchmarks[i]->thread_count = (uint32_t)CPU_COUNT( &(job.benchmarks[i]->execution_cpus) );
-        fprintf( stderr, "%s:%d:%s job.benchmarks[%"PRIu32"]->thread_count = %zu\n", __FILE__, __LINE__, __func__, i, job.benchmarks[i]->thread_count );
+    for( uint64_t i = 0; i < job.benchmark_count; i++ ){
 
         // Point to the global halt and ab_selector variables
         job.benchmarks[i]->halt        = &job.halt;
         job.benchmarks[i]->ab_selector = &job.ab_selector;
 
-        // Allocate space for nthreads pthread_t and pthread_mutex_t.
-        job.benchmarks[i]->benchmark_threads = calloc( job.benchmarks[i]->thread_count, sizeof( pthread_t ) );
-        assert( job.benchmarks[i]->benchmark_threads );
-        job.benchmarks[i]->benchmark_mutexes = calloc( job.benchmarks[i]->thread_count, sizeof( pthread_mutex_t ) );
-        assert( job.benchmarks[i]->benchmark_mutexes );
-
-        // Allocate space for executed_loops.
-        job.benchmarks[i]->executed_loops[0] = calloc( job.benchmarks[i]->thread_count, sizeof( uint64_t ) );
-        assert( job.benchmarks[i]->executed_loops[0] );
-        job.benchmarks[i]->executed_loops[1] = calloc( job.benchmarks[i]->thread_count, sizeof( uint64_t ) );
-        assert( job.benchmarks[i]->executed_loops[1] );
-
         // Set up each thread.
-        for( uint32_t t_idx = 0; t_idx < job.benchmarks[i]->thread_count; t_idx++ ){
-            assert( 0 == pthread_mutex_init( &(job.benchmarks[i]->benchmark_mutexes[t_idx]), NULL ) );
-            assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutexes[t_idx]) ) );
-            fprintf( stderr, "%s:%d:%s calling pthread create, benchmarks[%"PRIu32"]->benchmark_threads[%"PRIu32"]\n", __FILE__, __LINE__, __func__, i, t_idx );
-            assert( 0 == pthread_create(     &(job.benchmarks[i]->benchmark_threads[t_idx]),
-                    NULL, benchmark_thread_start, (void*)( (((uint64_t)i) << 32) | t_idx ) ) );
-        }
+        assert( 0 == pthread_mutex_init( &(job.benchmarks[i]->benchmark_mutex), NULL ) );
+        assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutex) ) );
+        assert( 0 == pthread_create(     &(job.benchmarks[i]->benchmark_thread), NULL, benchmark_thread_start, (void*)i ) );
     }
 
     // Poll thread initialization
@@ -165,9 +142,7 @@ int main( int argc, char **argv ){
 
     // Benchmark thread start
     for( uint32_t i = 0; i < job.benchmark_count; i++ ){
-        for( uint32_t t = 0; t < (uint32_t)CPU_COUNT( &(job.benchmarks[i]->execution_cpus) ); t++ ){
-            assert( 0 == pthread_mutex_unlock( &(job.benchmarks[i]->benchmark_mutexes[t]) ) );
-        }
+        assert( 0 == pthread_mutex_unlock( &(job.benchmarks[i]->benchmark_mutex ) ) );
     }
 
     // Sleep (note nanosleep does not rely on signals and is safe for multithreaded use).
@@ -197,9 +172,7 @@ int main( int argc, char **argv ){
 
     // Benchmark thread join
     for( uint32_t i = 0; i < job.benchmark_count; i++ ){
-        for( uint32_t t = 0; t < (uint32_t)CPU_COUNT( &(job.benchmarks[i]->execution_cpus) ); t++ ){
-            assert( 0 == pthread_join( job.benchmarks[i]->benchmark_threads[t], NULL ) );
-        }
+        assert( 0 == pthread_join( job.benchmarks[i]->benchmark_thread, NULL ) );
     }
 
     // Poll thread join
@@ -215,13 +188,7 @@ int main( int argc, char **argv ){
 
     // Benchmark thread cleanup
     for( uint32_t i = 0; i < job.benchmark_count; i++ ){
-        for( uint32_t t = 0; t < (uint32_t)CPU_COUNT( &(job.benchmarks[i]->execution_cpus) ); t++ ){
-            pthread_mutex_destroy( &(job.benchmarks[i]->benchmark_mutexes[t]) );
-        }
-        free( job.benchmarks[i]->benchmark_threads );
-        free( job.benchmarks[i]->benchmark_mutexes );
-        free( job.benchmarks[i]->executed_loops[ 0 ] );
-        free( job.benchmarks[i]->executed_loops[ 1 ] );
+        pthread_mutex_destroy( &(job.benchmarks[i]->benchmark_mutex) );
     }
 
     run_longitudinal_batches( &job, TEARDOWN );

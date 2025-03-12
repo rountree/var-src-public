@@ -1,12 +1,12 @@
 /* spin.c */
 #include "spin.h"
-void run_spin( struct benchmark_config *b, size_t tid ){
+void run_spin( struct benchmark_config *b ){
     uint64_t accumulator = 0;
     for( ; ! (*(b->halt)); accumulator++ );
-    b->executed_loops[ 0 ][ tid ] += accumulator;
+    b->executed_loops[ 0 ] += accumulator;
 }
 
-void run_abxor( struct benchmark_config * b, size_t tid ){
+void run_abxor( struct benchmark_config * b ){
 
     // If you touch this code, make sure to check to see if the compiler
     // optimized away the actual shift instructions.  Some of what's going
@@ -21,6 +21,6 @@ void run_abxor( struct benchmark_config * b, size_t tid ){
     }
     b->benchmark_param1 = to_be_shifted[ 0 ];   // forces the shifts to be executed, as
     b->benchmark_param2 = to_be_shifted[ 1 ];   // the results are externally visible.
-    b->executed_loops[ 0 ][ tid ] += accumulator[ 0 ];
-    b->executed_loops[ 1 ][ tid ] += accumulator[ 1 ];
+    b->executed_loops[ 0 ] += accumulator[ 0 ];
+    b->executed_loops[ 1 ] += accumulator[ 1 ];
 }

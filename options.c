@@ -91,7 +91,7 @@ static void print_parameters( struct job *job ){
                 job->benchmarks[i]->benchmark_param2,
                 job->benchmarks[i]->benchmark_param3 );
         printf("#          execution cpu id(s):  ");
-        print_cpuset( &job->benchmarks[i]->execution_cpus );
+        print_cpuset( &job->benchmarks[i]->execution_cpu );
     }
 
     // longitudinals
@@ -103,6 +103,8 @@ static void print_parameters( struct job *job ){
     }
 }
 
+#if 0
+Some of this needs reworking wrt each benchmark execution_cpu containing a single cpu.
 static void cpuset_checks( struct job *job ){
     // cpuset checks:  setup.  cpus isolated via the isolcpus boot parameter are still eligible
     // for sched_setaffinity.  cpus removed via taskset(1) are not eligible.
@@ -155,8 +157,8 @@ static void cpuset_checks( struct job *job ){
 
     // cpuset checks:  Every execution task of each benchmark task is eligible.
     for( size_t i = 0; i < job->benchmark_count; i++ ){
-        CPU_AND( &ANDed_cpus, &eligible_cpus, &(job->benchmarks[i]->execution_cpus) );
-        if( CPU_COUNT( &ANDed_cpus ) != CPU_COUNT( &(job->benchmarks[i]->execution_cpus) ) ){
+        CPU_AND( &ANDed_cpus, &eligible_cpus, &(job->benchmarks[i]->execution_cpu) );
+        if( CPU_COUNT( &ANDed_cpus ) != CPU_COUNT( &(job->benchmarks[i]->execution_cpu) ) ){
             printf("One or more of the specified execution cpus on benchmark task %zu is ineligible.\n", i);
             printf("Requested execution cpu(s):  ");
             print_cpuset( &(job->benchmarks[i]->execution_cpus ) );
@@ -193,6 +195,7 @@ static void cpuset_checks( struct job *job ){
         exit(-1);
     }
 }
+#endif
 
 void parse_options( int argc, char **argv, struct job *job ){
     // Default values:
@@ -431,7 +434,7 @@ void parse_options( int argc, char **argv, struct job *job ){
 
                     // cpu
                     current_cpu = get_next_cpu( current_cpu, 255, &all_cpus );
-                    cpu2cpuset( current_cpu++, &(job->benchmarks[ bch_idx ]->execution_cpus) );
+                    cpu2cpuset( current_cpu++, &(job->benchmarks[ bch_idx ]->execution_cpu) );
 
                     // Parameters
                     job->benchmarks[ bch_idx ]->benchmark_param1 = benchmark_param1;
@@ -520,7 +523,7 @@ void parse_options( int argc, char **argv, struct job *job ){
         }; // switch
     };
 
-    cpuset_checks( job );
+    //cpuset_checks( job );
 
     print_parameters( job );
 
