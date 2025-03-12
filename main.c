@@ -73,7 +73,9 @@ void* poll_thread_start( void *v ){
     assert( 0 == pthread_mutex_lock( &(job.polls[i]->poll_mutex) ) );
     for( size_t b = 0; b < job.polls[i]->total_ops && !(job.halt); b++ ){
         errno = 0;
+        job.polls[i]->poll_ops[b].tag |= job.ab_selector << 1;
         int rc = ioctl( fd, X86_IOC_MSR_BATCH, &(job.polls[i]->poll_batches[b]) );
+        job.polls[i]->poll_ops[b].tag |= job.ab_selector << 0;
         if( -1 == rc ){
             fprintf( stderr, "%s:%d:%s ioctl in poll thread %zu batch %zu returned %d, errno=%d.\n",
                     __FILE__, __LINE__, __func__, i, b, rc, errno );
