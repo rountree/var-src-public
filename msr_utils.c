@@ -483,6 +483,8 @@ static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, stru
     return;
 
 #if 0
+    This code appends the msr name and its ops to the end of the row.  Might not
+        be as useful now that batches are being printed out to their own files.
     printf("%s ", msr2str[ o->msr ]);
     uint16_t op = o->op;
     for( size_t op_idx = 0; 1 << op_idx <= MAX_OP_VAL ; op_idx++ ){
@@ -579,11 +581,21 @@ static void cleanup_poll_data( struct job *job ){
 }
 
 static void print_execution_counts( struct job *job ){
-    printf("# benchmark_id thread_id executionA executionB\n");
+    static char filename[2048];
     for( size_t i = 0; i < job->benchmark_count; i++ ){
-       for( size_t thread_idx = 0; thread_idx < job->benchmarks[ i ]->thread_count; thread_idx++ ){
-          printf( "# %02zu %02zu %15"PRIu64" %15"PRIu64"\n", i, thread_idx, job->benchmarks[ i ]->executed_loops[0][ thread_idx ], job->benchmarks[ i ]->executed_loops[1][ thread_idx ] );
-       }
+        snprintf( filename, 2047, "./benchmark_%zu_%s.out", i, benchmarktype2str[ job->benchmarks[ i ]->benchmark_type ] );
+        int fd = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
+        assert( fd >= 0 );
+        dprintf(fd, "benchmark_slot benchmark_type thrd_id A B\n");
+        for( size_t thread_idx = 0; thread_idx < job->benchmarks[ i ]->thread_count; thread_idx++ ){
+            dprintf( fd, "%02zu %s %02zu %15"PRIu64" %15"PRIu64"\n",
+                i,
+                benchmarktype2str[ job->benchmarks[ i ]->benchmark_type ],
+                thread_idx,
+                job->benchmarks[ i ]->executed_loops[0][ thread_idx ],
+                job->benchmarks[ i ]->executed_loops[1][ thread_idx ] );
+        }
+        close(fd);
     }
 }
 
@@ -614,18 +626,11 @@ void dump_batches( struct job *job ){
                     fprintf( stderr, "%s:%d:%s Error opening file %s.  Bye!\n", __FILE__, __LINE__, __func__, filename );
                     exit(-1);
                 }
-                fprintf( stderr, "%s:%d:%s op_field_bitidx_CPU    = %#"PRIx64"\n",     __FILE__, __LINE__, __func__, op_field_bitidx_CPU );
-                fprintf( stderr, "%s:%d:%s op_field_bitidx_ERR    = %#"PRIx64"\n",      __FILE__, __LINE__, __func__, op_field_bitidx_ERR );
-                fprintf( stderr, "%s:%d:%s op_field_bitidx_MSR    = %#"PRIx64"\n",      __FILE__, __LINE__, __func__, op_field_bitidx_MSR );
-                fprintf( stderr, "%s:%d:%s op_field_bitidx_MSRDATA= %#"PRIx64"\n",      __FILE__, __LINE__, __func__, op_field_bitidx_MSRDATA );
-                fprintf( stderr, "%s:%d:%s op_field_bitidx_TSC    = %#"PRIx64"\n",      __FILE__, __LINE__, __func__, op_field_bitidx_TSC );
-                fprintf( stderr, "%s:%d:%s                       |= %#"PRIx64"\n",      __FILE__, __LINE__, __func__, 
-                        op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC);
 
                 print_header( fd,op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC);
                 for( size_t op_idx = 0; op_idx < job->longitudinals[i]->batches[slot_idx]->numops; op_idx++ ){
                     print_op( fd, op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC,
-                            &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ), NULL, false);
+                            &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ), NULL, true);
                 }
                 close( fd );
             }
@@ -658,7 +663,7 @@ void dump_batches( struct job *job ){
             assert( job->polls[i]->total_ops > 2 );
             for( size_t o = 1; o < job->polls[i]->total_ops; o++ ){
                 for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
-                    print_op( fd[ arridx ], 1ULL << arridx, &(job->polls[i]->poll_ops[o]), &(job->polls[i]->poll_ops[ o-1 ]), false );
+                    print_op( fd[ arridx ], 1ULL << arridx, &(job->polls[i]->poll_ops[o]), &(job->polls[i]->poll_ops[ o-1 ]), true );
                 }
             }
             // Close a bunch of files.
