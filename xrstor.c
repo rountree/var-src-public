@@ -1,3 +1,6 @@
+/* This benchmark ended up not being at all useful and is starting to
+ * undergo bitrot.*/
+
 #include <cpuid.h>
 #include <assert.h>
 #include <stdio.h>
