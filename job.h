@@ -77,7 +77,6 @@ struct job{
     size_t                      longitudinal_count; // The number of -l/--longitudinal options parsed on the command line.
 
     struct timespec             duration;           // (seconds:nanoseconds) main sleeps this long (nanosleep is thread-safe).
-    uint64_t                    debug_level;
     volatile bool               halt;               // The big red off button.
     volatile bool               ab_selector;
     bool                        ab_randomized;      // If true, randomly select whether to run A or B next.  False alternates.

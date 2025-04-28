@@ -19,7 +19,6 @@ static void print_help( void ){
     printf( "Options:\n" );
     printf( "  -h / --help      Print this message and exit.\n");
     printf( "  -v / --version   Print version information and exit.\n");
-    printf( "  -d / --debug_level=<level> (Higher is more verbose, max is 3.)\n");
     printf( "\n");
     printf( "  -t / --time=<hours>:<minutes>:<seconds> (Default is 10 seconds)\n");
     printf( "\n");
@@ -208,7 +207,6 @@ void parse_options( int argc, char **argv, struct job *job ){
 
     static struct option long_options[] = {
         { .name = "benchmark",    .has_arg = required_argument, .flag = NULL, .val = 'b' },
-        { .name = "debug_level",  .has_arg = required_argument, .flag = NULL, .val = 'd' },
         { .name = "help",         .has_arg = no_argument,       .flag = NULL, .val = 'h' },
         { .name = "longitudinal", .has_arg = required_argument, .flag = NULL, .val = 'l' },
         { .name = "main",         .has_arg = required_argument, .flag = NULL, .val = 'm' },
@@ -277,9 +275,6 @@ void parse_options( int argc, char **argv, struct job *job ){
             }
             case 'R':
                 job->ab_randomized = true;
-                break;
-            case 'd':   // debug_level
-                job->debug_level = safe_strtoull( optarg );
                 break;
             case 't':   // time
             {
