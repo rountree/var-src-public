@@ -704,3 +704,30 @@ void run_longitudinal_batches( struct job *job, longitudinal_slot_t slot_idx ){
         initialized = 0;
     }
 }
+
+uint16_t parse_flags( const char * const s ){
+    char *local_str = strdup( s );
+    uint16_t flags = 0;
+    char *endptr;
+    char *token  = strtok_r( local_str, "|", &endptr );
+    while( NULL != token ){
+        if(      0 == strcmp( "OP_WRITE",      token ) ){ flags |= OP_WRITE;        }
+        else if( 0 == strcmp( "OP_READ",       token ) ){ flags |= OP_READ;         }
+        else if( 0 == strcmp( "OP_POLL",       token ) ){ flags |= OP_POLL;         }
+        else if( 0 == strcmp( "OP_MPERF",      token ) ){ flags |= OP_MPERF;        }
+        else if( 0 == strcmp( "OP_APERF",      token ) ){ flags |= OP_APERF;        }
+        else if( 0 == strcmp( "OP_TSC",        token ) ){ flags |= OP_TSC;          }
+        else if( 0 == strcmp( "OP_THERM",      token ) ){ flags |= OP_THERM;        }
+        else if( 0 == strcmp( "OP_PTHERM",     token ) ){ flags |= OP_PTHERM;       }
+        else if( 0 == strcmp( "DELTA_MPERF",   token ) ){ flags |= DELTA_MPERF;     }
+        else if( 0 == strcmp( "DELTA_APERF",   token ) ){ flags |= DELTA_APERF;     }
+        else if( 0 == strcmp( "DELTA_TSC",     token ) ){ flags |= DELTA_TSC;       }
+        else if( 0 == strcmp( "DELTA_THERM",   token ) ){ flags |= DELTA_THERM;     }
+        else if( 0 == strcmp( "DELTA_PTHERM",  token ) ){ flags |= DELTA_PTHERM;    }
+        else if( 0 == strcmp( "DELTA_MSRDATA", token ) ){ flags |= DELTA_MSRDATA;   }
+        token = strtok_r( NULL, "|", &endptr );
+    }
+    free( local_str );
+    return flags;
+}
+
