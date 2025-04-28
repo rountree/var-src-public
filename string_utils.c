@@ -3,6 +3,28 @@
 #include <errno.h>      // errno(3)
 #include <stdio.h>      // printf(3)
 #include <stdlib.h>     // exit(3)
+#include <limits.h>     // ULONG_WIDTH, etc.
+#include <assert.h>     // assert(3)
+#include <time.h>       // struct timespec
+#include "string_utils.h"
+
+#if __LP64__            // long ints and pointers are 64 bits, ints are 32 bits.
+                        // https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+
+uint64_t strtouint64_t( const char *restrict nptr, char **restrict endptr, int base ){
+    return strtoull( nptr, endptr, base );
+}
+uint32_t strtouint32_t( const char *restrict nptr, char **restrict endptr, int base ){
+    return (uint32_t) strtoull( nptr, endptr, base );
+}
+int64_t strtoint64_t( const char *restrict nptr, char **restrict endptr, int base ){
+    return strtoll( nptr, endptr, base );
+}
+int32_t strtoint32_t( const char *restrict nptr, char **restrict endptr, int base ){
+    return (uint32_t) strtoll( nptr, endptr, base );
+}
+#endif //__LP64__
+
 
 unsigned long long safe_strtoull( const char * restrict s ){
     // Assume <s> is a string containing only numerically relevant characters
