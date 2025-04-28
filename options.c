@@ -20,7 +20,7 @@ static void print_help( void ){
     printf( "  -h / --help      Print this message and exit.\n");
     printf( "  -v / --version   Print version information and exit.\n");
     printf( "\n");
-    printf( "  -t / --time=<hours>:<minutes>:<seconds> (Default is 10 seconds)\n");
+    printf( "  -t / --time=<timespec> (Default is 10 seconds)\n");
     printf( "\n");
     printf( "  -m / --main=<main_cpu>\n");
     printf( "  -b / --benchmark=<benchmark_type>:<execution_cpus>:<param1>:<param2>:<param3>\n");
@@ -61,6 +61,12 @@ static void print_help( void ){
     printf( "  should take up all CPUs on an isolated socket, while each\n");
     printf( "  <control_cpu> and the single <main_cpu> share a socket with, say,\n");
     printf( "  operating system background tasks.\n");
+    printf( "\n");
+    printf( "A <timespec> is a non-negative integer following by an optional suffix,\n");
+    printf( "  \"ns\", \"us\", \"ms\", \"s\", \"m\", or \"h\", corresponding to\n");
+    printf( "  to nanoseconds, microseconds, milliseconds, seconds, minutes, or hours,\n");
+    printf( "  respectively.  The absence of a suffix implies seconds.\n");
+    printf( "\n");
 }
 
 static void print_parameters( struct job *job ){
@@ -276,26 +282,10 @@ void parse_options( int argc, char **argv, struct job *job ){
             case 'R':
                 job->ab_randomized = true;
                 break;
-            case 't':   // time
+            case 't':   // time (duration)
             {
                 char *local_optarg = strdup( optarg );
-                char *saveptr        = NULL;
-                char *hours          = strtok_r( local_optarg, ":", &saveptr );
-                char *minutes        = strtok_r( NULL,         ":", &saveptr );
-                char *seconds        = strtok_r( NULL,         ":", &saveptr );
-                char *should_be_null = strtok_r( NULL,         ":", &saveptr );
-
-                if( (NULL == hours) || ( NULL == minutes ) || ( NULL == seconds ) || ( NULL != should_be_null ) ) {
-                    printf("%s:%d:%s -t / --time format is <hours>:<minutes>:<seconds>\n"
-                            "Got optarg=%s parsed as %s:%s:%s instead.\n"
-                            "should_be_null = %s\n",
-                            __FILE__, __LINE__, __func__, optarg, hours, minutes, seconds, should_be_null );
-                    exit(-1);
-                }
-                job->duration.tv_sec =
-                    safe_strtoull( seconds )
-                    + safe_strtoull( minutes ) * 60L
-                    + safe_strtoull( hours )   * 60L * 60L;
+                str2timespec( local_optarg, &(job->duration) );
                 free( local_optarg );
                 break;
             }
