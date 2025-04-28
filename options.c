@@ -10,7 +10,7 @@
 #include "string_utils.h"       // safe_strtoull()
 #include "cpuset_utils.h"       // str2cpuset()
 #include "version.h"
-
+#include "msr_utils.h"          // parse_flags()
 static void print_help( void ){
     printf( "vanallin [options]\n" );
     printf( "  Version %"PRIu64".\n", vanallin_version );
@@ -25,33 +25,23 @@ static void print_help( void ){
     printf( "  -m / --main=<main_cpu>\n");
     printf( "  -b / --benchmark=<benchmark_type>:<execution_cpus>:<param1>:<param2>:<param3>\n");
     printf( "  -l / --longitudinal=<longitudinal_type>:<sample_cpus>\n");
-    printf( "  -p / --poll=<poll_type>:<control_cpu>:<sample_cpu>\n");
+    printf( "  -p / --poll=<msr_address>:<flags>:<timespec>:<control_cpu>:<sample_cpu>\n");
     printf( "\n");
     printf( "  -R / --abRandomized (enables random a|b selection)\n");
     printf( "  -T / --abTime=<seconds>:<milliseconds (default is 1 second)\n");
     printf( "\n");
     printf( "The available benchmarks are SPIN, and ABSHIFT.\n");
     printf( "\n");
-    printf( "The two valid <longitudinal_type>s are FIXED_FUNCTION_COUNTERS\n");
-    printf( "  and ENERGY_COUNTERS.  With regard to the former:\n");
+    printf( "The <longitudinal_type> may be either\n");
+    printf( "  FIXED_FUNCTION_COUNTERS\n");
     printf( "    The counter accumulators for instructions retired, reference\n");
     printf( "    cycles, and cycle counts will be zeroed out before the start\n");
     printf( "    of the benchmark(s) and read out after <duration> seconds\n");
     printf( "    elapse.\n");
-    printf( "  With regard to the latter:\n");
+    printf( "  ENERGY_COUNTERS\n");
     printf( "    All possible counters are read, but only a subset will be present\n");
     printf( "    on any particular processor.  Check the error field for whether or\n");
     printf( "    not a reading is meaningful.  All values are package-scope.\n");
-    printf( "\n");
-    printf( "Valid <poll_types> are:\n");
-    printf( "    PKG_ENERGY, PP0_ENERGY, PP1_ENERGY, DRAM_ENERGY\n");
-    printf( "    CORE_THERMAL, PKG_THERMAL\n");
-    printf( "    FREQUENCY\n");
-    printf( "  The MSRs responsible for each are expected to be updated at 1kHz\n");
-    printf( "  (once per millisecond, more or less).  Each sample contains the\n");
-    printf( "  timestamped initial and changed register values.  If the value\n");
-    printf( "  fails to change over roughly 10 milliseconds, the sample indicates\n");
-    printf( "  the number of maximum reads was exceeded.\n");
     printf( "\n");
     printf( "The several <cpu> fields expect CPU numbering of the type used by\n");
     printf( "  sched_setaffinity(2).  These can take the form of a single integer,\n");
@@ -67,8 +57,12 @@ static void print_help( void ){
     printf( "  to nanoseconds, microseconds, milliseconds, seconds, minutes, or hours,\n");
     printf( "  respectively.  The absence of a suffix implies seconds.\n");
     printf( "\n");
+    printf( "The msr_safe.h header describes the bitfields that can be OR'ed together\n");
+    printf( "  for the .op field of struct msr_batch_op.  The <flags> field allows the\n");
+    printf( "  user to specify these flags directly.\n");
 }
 
+#if 0
 static void print_parameters( struct job *job ){
 
     printf("# %s:%d:%s\n# %d main cpu(s):  ", __FILE__, __LINE__, __func__, CPU_COUNT( &job->main_cpu ) );
@@ -107,101 +101,7 @@ static void print_parameters( struct job *job ){
         print_cpuset( &job->longitudinals[i]->sample_cpus );
     }
 }
-
-#if 0
-Some of this needs reworking wrt each benchmark execution_cpu containing a single cpu.
-static void cpuset_checks( struct job *job ){
-    // cpuset checks:  setup.  cpus isolated via the isolcpus boot parameter are still eligible
-    // for sched_setaffinity.  cpus removed via taskset(1) are not eligible.
-    cpu_set_t eligible_cpus, ANDed_cpus;
-    assert( 0 == sched_getaffinity( 0, sizeof( cpu_set_t ), &eligible_cpus ) );
-
-    // cpuset checks:  There is exactly one main cpu, and it must be eligible.
-    if( 1 != CPU_COUNT( &job->main_cpu ) ){
-        printf("Error:  Need to specify exactly one main cpu via -m <cpu> or --main=<cpu>\n");
-        exit(-1);
-    }
-    CPU_AND( &ANDed_cpus, &eligible_cpus, &job->main_cpu );
-    if( 1 != CPU_COUNT( &ANDed_cpus ) ){
-        printf("Requested main cpu is not on the list of eligible cpus.\n");
-        printf("Requested main cpu:  ");
-        print_cpuset( &job->main_cpu );
-        printf("Eligible cpus:  ");
-        print_cpuset( &eligible_cpus );
-        exit(-1);
-    }
-
-    // cpuset checks:  Each poll task has a single eligible control cpu and a single eligible polled cpu.
-    for( size_t i = 0; i < job->poll_count; i++ ){
-        if( 1 != CPU_COUNT( &(job->polls[i]->control_cpu) ) ){
-            printf("Poll task #%zu must have exactly one control cpu.\n", i);
-            exit(-1);
-        }
-        if( 1 != CPU_COUNT( &(job->polls[i]->polled_cpu) ) ){
-            printf("Poll task #%zu must have exactly one polled cpu.\n", i);
-        }
-        CPU_AND( &ANDed_cpus, &eligible_cpus, &(job->polls[i]->control_cpu) );
-        if( 1 != CPU_COUNT( &ANDed_cpus ) ){
-            printf("The specified control cpu in not eligible.\n");
-            printf("Requested control cpu:");
-            print_cpuset( &(job->polls[i]->control_cpu) );
-            printf("Eligible cpus:  ");
-            print_cpuset( &eligible_cpus );
-            exit(-1);
-        }
-        CPU_AND( &ANDed_cpus, &eligible_cpus, &(job->polls[i]->polled_cpu) );
-        if( 1 != CPU_COUNT( &ANDed_cpus ) ){
-            printf("The specified polled cpu in not eligible.\n");
-            printf("Requested polled cpu:");
-            print_cpuset( &(job->polls[i]->polled_cpu) );
-            printf("Eligible cpus:  ");
-            print_cpuset( &eligible_cpus );
-            exit(-1);
-        }
-    }
-
-    // cpuset checks:  Every execution task of each benchmark task is eligible.
-    for( size_t i = 0; i < job->benchmark_count; i++ ){
-        CPU_AND( &ANDed_cpus, &eligible_cpus, &(job->benchmarks[i]->execution_cpu) );
-        if( CPU_COUNT( &ANDed_cpus ) != CPU_COUNT( &(job->benchmarks[i]->execution_cpu) ) ){
-            printf("One or more of the specified execution cpus on benchmark task %zu is ineligible.\n", i);
-            printf("Requested execution cpu(s):  ");
-            print_cpuset( &(job->benchmarks[i]->execution_cpus ) );
-            printf("Eligible cpus:  ");
-            print_cpuset( &eligible_cpus );
-            exit(-1);
-        }
-
-    }
-
-    // cpuset checks:  Main, control, polled, and execution cpus must be unique across all polling and benchmark tasks.
-    int allegedly_unique_cpus_count = 0;
-    cpu_set_t allegedly_unique_cpus;
-    CPU_ZERO( &allegedly_unique_cpus );
-
-    CPU_OR( &allegedly_unique_cpus, &allegedly_unique_cpus, &job->main_cpu );
-    allegedly_unique_cpus_count += CPU_COUNT( &job->main_cpu );
-
-    for( size_t i = 0; i < job->poll_count; i++ ){
-        CPU_OR( &allegedly_unique_cpus, &allegedly_unique_cpus, &(job->polls[i]->control_cpu) );
-        allegedly_unique_cpus_count += CPU_COUNT( &(job->polls[i]->control_cpu) );
-        CPU_OR( &allegedly_unique_cpus, &allegedly_unique_cpus, &(job->polls[i]->polled_cpu) );
-        allegedly_unique_cpus_count += CPU_COUNT( &(job->polls[i]->polled_cpu) );
-    }
-
-    for( size_t i = 0; i < job->benchmark_count; i++ ){
-        CPU_OR( &allegedly_unique_cpus, &allegedly_unique_cpus, &(job->benchmarks[i]->execution_cpus) );
-        allegedly_unique_cpus_count += CPU_COUNT( &(job->benchmarks[i]->execution_cpus) );
-    }
-
-    if( CPU_COUNT( &allegedly_unique_cpus ) != allegedly_unique_cpus_count ){
-        printf("There are one or more duplicate cpus among the main, control, polled, and execution cpus.\n");
-        printf("Good luck!\n");
-        exit(-1);
-    }
-}
-#endif
-
+#endif 
 void parse_options( int argc, char **argv, struct job *job ){
     // Default values:
     job->duration.tv_sec     = 10;
@@ -209,7 +109,6 @@ void parse_options( int argc, char **argv, struct job *job ){
     job->ab_randomized       =  false;
     job->ab_duration.tv_sec  =  1;
     job->ab_duration.tv_nsec =  0;
-
 
     static struct option long_options[] = {
         { .name = "benchmark",    .has_arg = required_argument, .flag = NULL, .val = 'b' },
@@ -448,55 +347,57 @@ void parse_options( int argc, char **argv, struct job *job ){
                 job->polls[ job->poll_count - 1 ] = pll;
 
                 // Parse optarg
-                char *local_optarg = malloc( strlen(optarg) + 1 );
-                assert( local_optarg );
-                strcpy( local_optarg, optarg );
+                pll->local_optarg = strdup( optarg );   // Save this one for describing output.
+                char *local_optarg = strdup( optarg );  // Let strtok_r() chew on this one.
                 char *saveptr = NULL;
-                char *pll_type = strtok_r( local_optarg, ":", &saveptr);
-                char *pll_control_cpuset = strtok_r( NULL, ":", &saveptr );
-                char *pll_polled_cpuset = strtok_r( NULL, ":", &saveptr );
-                char *should_be_null = strtok_r( NULL, ":", &saveptr);
-                if( NULL == pll_control_cpuset ){
-                    printf( "%s:%d:%s Parameter (%s) to -b/--poll missing <control_cpus>.\n",
-                            __FILE__, __LINE__, __func__, optarg);
+
+                char *pll_msr_str               = strtok_r( local_optarg, ":", &saveptr);
+                char *pll_flags_str             = strtok_r( NULL, ":", &saveptr );
+                char *pll_timespec_str          = strtok_r( NULL, ":", &saveptr );
+                char *pll_control_cpuset_str    = strtok_r( NULL, ":", &saveptr );
+                char *pll_polled_cpuset_str     = strtok_r( NULL, ":", &saveptr );
+                char *should_be_null            = strtok_r( NULL, ":", &saveptr);
+                if( NULL == pll_msr_str ){
+                    printf( "%s:%d:%s Parameter (%s) to -p/--poll missing required <msr_address>.\n",
+                            __FILE__, __LINE__, __func__, pll->local_optarg );
+                    exit( -1 );
+                }
+                if( NULL == pll_flags_str ){
+                    printf( "%s:%d:%s Parameter (%s) to -p/--poll missing required <flags>.\n",
+                            __FILE__, __LINE__, __func__, pll->local_optarg );
+                    exit( -1 );
+                }
+                if( NULL == pll_timespec_str ){
+                    printf( "%s:%d:%s Parameter (%s) to -p/--poll missing required <timespec>.\n",
+                            __FILE__, __LINE__, __func__, pll->local_optarg );
+                    exit( -1 );
+                }
+                if( NULL == pll_control_cpuset_str ){
+                    printf( "%s:%d:%s Parameter (%s) to -p/--poll missing required <control_cpus>.\n",
+                            __FILE__, __LINE__, __func__, pll->local_optarg );
                     exit( -1 ) ;
                 }
-                if( NULL == pll_polled_cpuset ){
-                    printf( "%s:%d:%s Parameter (%s) to -b/--poll missing <sample_cpu>.\n",
-                            __FILE__, __LINE__, __func__, optarg);
+                if( NULL == pll_polled_cpuset_str ){
+                    printf( "%s:%d:%s Parameter (%s) to -p/--poll missing required <sample_cpu>.\n",
+                            __FILE__, __LINE__, __func__, pll->local_optarg );
                     exit( -1 ) ;
                 }
                 if( NULL != should_be_null ){
-                    printf( "%s:%d:%s Extra parameters in -b/--poll (%s).\n",
-                            __FILE__, __LINE__, __func__, optarg);
+                    printf( "%s:%d:%s Extra parameters in -p/--poll (%s).\n",
+                            __FILE__, __LINE__, __func__, pll->local_optarg );
                     exit(-1);
                 }
 
+fprintf( stderr, "%s:%d:%s Beep\n", __FILE__, __LINE__, __func__ );
                 // Fill in the struct
-                if( 0 == strcmp( polltype2str[PKG_ENERGY], pll_type ) ){
-                    pll->poll_type = PKG_ENERGY;
-                }else if( 0 == strcmp( polltype2str[PP0_ENERGY], pll_type ) ){
-                    pll->poll_type = PP0_ENERGY;
-                }else if( 0 == strcmp( polltype2str[PP1_ENERGY], pll_type ) ){
-                    pll->poll_type = PP1_ENERGY;
-                }else if( 0 == strcmp( polltype2str[DRAM_ENERGY], pll_type ) ){
-                    pll->poll_type = DRAM_ENERGY;
-                }else if( 0 == strcmp( polltype2str[PKG_THERMAL], pll_type ) ){
-                    pll->poll_type = PKG_THERMAL;
-                }else if( 0 == strcmp( polltype2str[CORE_THERMAL], pll_type ) ){
-                    pll->poll_type = CORE_THERMAL;
-                }else if( 0 == strcmp( polltype2str[FREQUENCY], pll_type ) ){
-                    pll->poll_type = FREQUENCY;
-                }else{
-                    printf( "%s:%d:%s Unknown poll type (%s).\n",
-                            __FILE__, __LINE__, __func__, pll_type );
-                    exit(-1);
-                }
-                str2cpuset( pll_polled_cpuset, &pll->polled_cpu );
-                str2cpuset( pll_control_cpuset, &pll->control_cpu );
+                pll->msr = (uint32_t)safe_strtoull( pll_msr_str );
+                pll->flags = (uint16_t)parse_flags( pll_flags_str );
+                str2timespec( pll_timespec_str, &pll->interval );
+                str2cpuset( pll_polled_cpuset_str, &pll->polled_cpu );
+                str2cpuset( pll_control_cpuset_str, &pll->control_cpu );
 
                 free(local_optarg);
-
+fprintf( stderr, "%s:%d:%s Beep\n", __FILE__, __LINE__, __func__ );
                 break;
             }
             case 'v':   // version
@@ -504,12 +405,13 @@ void parse_options( int argc, char **argv, struct job *job ){
                 exit(0);
             case 'h':   // help
                 print_help();
+                exit(0);
                 break;
         }; // switch
     };
 
     //cpuset_checks( job );
 
-    print_parameters( job );
+    //print_parameters( job );
 
 }

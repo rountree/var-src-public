@@ -39,6 +39,7 @@ static struct job job;
 
 static void cleanup( void ){
     for( size_t i = 0; i < job.poll_count; i++ ){
+        free( job.polls[i]->local_optarg );
         free( job.polls[i] );
         job.polls[i] = NULL;
     }
@@ -73,8 +74,11 @@ void* poll_thread_start( void *v ){
     assert( 0 == pthread_mutex_lock( &(job.polls[i]->poll_mutex) ) );
     for( size_t b = 0; b < job.polls[i]->total_ops && !(job.halt); b++ ){
         errno = 0;
+fprintf( stderr, "%s:%d:%s Beep i=%zu job.polls[i]->total_ops=%zu\n", __FILE__, __LINE__, __func__, i, job.polls[i]->total_ops );
         job.polls[i]->poll_ops[b].tag |= job.ab_selector << 1;
+fprintf( stderr, "%s:%d:%s Beep\n", __FILE__, __LINE__, __func__ );
         int rc = ioctl( fd, X86_IOC_MSR_BATCH, &(job.polls[i]->poll_batches[b]) );
+fprintf( stderr, "%s:%d:%s Beep\n", __FILE__, __LINE__, __func__ );
         job.polls[i]->poll_ops[b].tag |= job.ab_selector << 0;
         if( -1 == rc ){
             fprintf( stderr, "%s:%d:%s ioctl in poll thread %zu batch %zu returned %d, errno=%d.\n",
@@ -84,6 +88,7 @@ void* poll_thread_start( void *v ){
         }
     }
     close( fd );
+fprintf( stderr, "%s:%d:%s Beep\n", __FILE__, __LINE__, __func__ );
     return 0;
 }
 
@@ -106,8 +111,9 @@ int main( int argc, char **argv ){
     sizeof_check();
     parse_options( argc, argv, &job );
     populate_allowlist();
+fprintf( stderr, "%s:%d:%s Beep\n", __FILE__, __LINE__, __func__ );
     setup_msrsafe_batches( &job );
-
+fprintf( stderr, "%s:%d:%s Beep\n", __FILE__, __LINE__, __func__ );
     // Pin the main thread to the cpu requested.
     assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.main_cpu) ) );
 
@@ -182,7 +188,7 @@ int main( int argc, char **argv ){
         assert( 0 == pthread_join( job.polls[i]->poll_thread, NULL ) );
     }
 
-    printf("# a|b iterations:  %"PRIu64", %"PRIu64".\n", iterations[0], iterations[1]);
+    //printf("# a|b iterations:  %"PRIu64", %"PRIu64".\n", iterations[0], iterations[1]); FIXME
 
     run_longitudinal_batches( &job, STOP );
     run_longitudinal_batches( &job, READ );

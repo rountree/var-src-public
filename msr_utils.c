@@ -18,7 +18,8 @@
 #define EXTRACT_TEMPERATURE(x) ( (x>>16) & 0x7fULL )
 #define UNUSED_OP ((__s32)(0xDECAFBAD))
 
-static uint16_t max_msrsafe_cpu = UINT16_MAX;   // current limitation of msr-safe.
+static constexpr const uint16_t max_msrsafe_cpu = UINT16_MAX;   // current limitation of msr-safe.
+static constexpr const uint32_t MAX_POLL_ATTEMPTS = 10000;
 
 //////////////////////////////////////////////////////////////////////////////////
 // List of MSRs
@@ -160,7 +161,6 @@ static char const *const allowlist =
     "0x0771 0x0000000000000000\n"      // HWP_CAPABILITIES
     ;
 
-static constexpr const uint32_t MAX_POLL_ATTEMPTS = 10000;
 
 //////////////////////////////////////////////////////////////////////////////////
 // Available ops.
@@ -179,18 +179,6 @@ static constexpr const struct msr_batch_op op_enable_fixed = { .op = OP_WRITE | 
 // Enable/disable all fixed and programmable counters, global.  (Just fixed counters for now.)
 static constexpr const struct msr_batch_op op_start_global = { .op = OP_WRITE | OP_TSC, .msr = PERF_GLOBAL_CTRL, .msrdata=0x700000000 };
 static constexpr const struct msr_batch_op op_stop_global  = { .op = OP_WRITE | OP_TSC, .msr = PERF_GLOBAL_CTRL, .msrdata=0x000000000 };
-
-// Polling instructions.  C and F need some attention.
-static constexpr const struct msr_batch_op op_poll_pkg_J = { .op = OP_POLL | OP_ALL_MODS, .msr = PKG_ENERGY_STATUS,    .poll_max=MAX_POLL_ATTEMPTS };
-static constexpr const struct msr_batch_op op_poll_pp0_J = { .op = OP_POLL | OP_ALL_MODS, .msr = PP0_ENERGY_STATUS,    .poll_max=MAX_POLL_ATTEMPTS };
-static constexpr const struct msr_batch_op op_poll_pp1_J = { .op = OP_POLL | OP_ALL_MODS, .msr = PP1_ENERGY_STATUS,    .poll_max=MAX_POLL_ATTEMPTS };
-static constexpr const struct msr_batch_op op_poll_dram_J= { .op = OP_POLL | OP_ALL_MODS, .msr = DRAM_ENERGY_STATUS,   .poll_max=MAX_POLL_ATTEMPTS };
-
-static constexpr const struct msr_batch_op op_poll_pkg_C = { .op = OP_POLL | OP_ALL_MODS, .msr = PACKAGE_THERM_STATUS, .poll_max=MAX_POLL_ATTEMPTS };
-static constexpr const struct msr_batch_op op_poll_core_C= { .op = OP_POLL | OP_ALL_MODS, .msr = THERM_STATUS,         .poll_max=MAX_POLL_ATTEMPTS };
-
-
-static constexpr const struct msr_batch_op op_poll_pkg_F = { .op = OP_POLL | OP_ALL_MODS, .msr = PERF_STATUS,          .poll_max=MAX_POLL_ATTEMPTS };
 
 // Single-read energy instructions.
 static constexpr const struct msr_batch_op op_rd_RAPL_POWER_UNIT         = { .op = OP_READ | OP_ALL_MODS, .msr = RAPL_POWER_UNIT };
@@ -274,56 +262,42 @@ static void setup_polling_batches( struct job *job ){
     // Map the polling batches
     for( size_t i = 0; i < job->poll_count; i++ ){
         // Assume msrs being polled will be updated 1k times/second.
+        // FIXME the above assumption no longer holds.
+        // One op per batch, and (for now) one cpu per batch.
         job->polls[i]->total_ops = 1024 * job->duration.tv_sec;
         job->polls[i]->poll_batches = calloc( job->polls[i]->total_ops, sizeof( struct msr_batch_array ) );
         assert( job->polls[i]->poll_batches );
         job->polls[i]->poll_ops = calloc( job->polls[i]->total_ops, sizeof( struct msr_batch_op ) );
         assert( job->polls[i]->poll_ops );
 
-        // Leave the last op as all-zeros.
-        const struct msr_batch_op * op;
-        switch( job->polls[i]->poll_type ){
-            case PKG_ENERGY:
-                op = &op_poll_pkg_J;
-                break;
-            case PP0_ENERGY:
-                op = &op_poll_pp0_J;
-                break;
-            case PP1_ENERGY:
-                op = &op_poll_pp1_J;
-                break;
-            case DRAM_ENERGY:
-                op = &op_poll_dram_J;
-                break;
-            case CORE_THERMAL:
-                op = &op_poll_core_C;
-                break;
-            case PKG_THERMAL:
-                op = &op_poll_pkg_C;
-                break;
-            case FREQUENCY:
-                op = &op_poll_pkg_F;
-                break;
-            default:
-                assert(0);
-                break;
-        }
-
         // Find the polled cpu.
-        uint16_t polled_cpu = (uint16_t)( get_next_cpu( 0, 255, &(job->polls[i]->polled_cpu) ) );
+        uint16_t polled_cpu = (uint16_t)( get_next_cpu( 0, max_msrsafe_cpu, &(job->polls[i]->polled_cpu) ) );
+
+        // Create the msr_batch_op that we'll copy into all of the msr_batch_arrays.
+        struct msr_batch_op op = {
+            .cpu        = polled_cpu,
+            .op         = job->polls[i]->flags,
+            .err        = UNUSED_OP,
+            .poll_max   = MAX_POLL_ATTEMPTS,
+            .msr        = job->polls[i]->msr,
+            .wmask      = 0,
+            .msrdata    = 0,
+            .msrdata2   = 0,
+            .tsc        = 0,
+            .mperf      = 0,
+            .aperf      = 0,
+            .therm      = 0,
+            .ptherm     = 0,
+            .tag        = 0 };
 
         // For each op, fill in an msr_batch_array and a single msr_batch_op.
         for( size_t j = 0; j < job->polls[i]->total_ops; j++ ){
             job->polls[i]->poll_batches[j].numops = 1;
             job->polls[i]->poll_batches[j].version = MSR_SAFE_VERSION_u32;
             job->polls[i]->poll_batches[j].ops = &(job->polls[i]->poll_ops[j]);
-            memcpy( &(job->polls[i]->poll_ops[j]), op, sizeof( struct msr_batch_op ) );
-            job->polls[i]->poll_ops[j].cpu = polled_cpu;
-            job->polls[i]->poll_ops[j].err = UNUSED_OP;
+            memcpy( &(job->polls[i]->poll_ops[j]), &op, sizeof( struct msr_batch_op ) );
        }
     }
-
-
 }
 
 static void setup_longitudinal_batches( struct job *job ){
@@ -496,6 +470,7 @@ static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, stru
     printf("\n");
 }
 
+#if 0
 static void print_summaries( struct job *job ){
 
     for( size_t i = 0; i < job->poll_count; i++ ){
@@ -516,7 +491,7 @@ static void print_summaries( struct job *job ){
             }
         }
         o--;    // We want the last-non-DECAFBAD op.
-        printf( "# SUMMARY %s\n", polltype2str[ job->polls[i]->poll_type ] );
+        printf( "# SUMMARY %s\n", job->polls[i]->local_optarg );
         if( PKG_ENERGY == job->polls[i]->poll_type
          || PP0_ENERGY == job->polls[i]->poll_type
          || PP1_ENERGY == job->polls[i]->poll_type
@@ -533,7 +508,8 @@ static void print_summaries( struct job *job ){
 
     }
 }
-
+#endif
+#if 0
 static void cleanup_poll_data( struct job *job ){
 
     uint64_t cumulative_adjustment = 0;
@@ -579,7 +555,7 @@ static void cleanup_poll_data( struct job *job ){
         }
     }
 }
-
+#endif 
 static void print_execution_counts( struct job *job ){
     static char filename[2048];
     snprintf( filename, 2047, "./benchmarks.out" );
@@ -637,8 +613,8 @@ void dump_batches( struct job *job ){
     if( job->poll_count ){
 
         // polls
-        cleanup_poll_data( job );
-        print_summaries( job );
+        //cleanup_poll_data( job ); FIXME
+        //print_summaries( job );   FIXME
         printf( "# Dumping poll batches\n");
         for( size_t i = 0; i < job->poll_count; i++ ){
 
@@ -646,7 +622,7 @@ void dump_batches( struct job *job ){
             static char filename[2048];
             int fd[ op_field_arridx_MAX_IDX ];
             for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
-                snprintf( filename, 2047, "./poll_%zu_%s_%s.out", i, polltype2str[ job->polls[i]->poll_type ], opfield2str[ arridx ]);
+                snprintf( filename, 2047, "./poll_%s.out", job->polls[i]->local_optarg );
                 fd[ arridx ] = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
                 if( fd[ arridx ] < 0 ){
                     perror("");

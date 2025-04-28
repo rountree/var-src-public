@@ -5,10 +5,6 @@
 #include <stdint.h>
 #include <pthread.h>
 
-
-typedef enum{                                PKG_ENERGY,   PP0_ENERGY,   PP1_ENERGY,   DRAM_ENERGY,   CORE_THERMAL,   PKG_THERMAL,   FREQUENCY, NUM_POLL_TYPES} poll_t;
-static const char * const polltype2str[] = {"PKG_ENERGY", "PP0_ENERGY", "PP1_ENERGY", "DRAM_ENERGY", "CORE_THERMAL", "PKG_THERMAL", "FREQUENCY" };
-
 typedef enum{                                      SPIN,   ABSHIFT  } benchmark_t;
 static const char * const benchmarktype2str[] = { "SPIN", "ABSHIFT" };
 
@@ -28,7 +24,10 @@ static const char * const longitudinalslot2str[] = {"SETUP", "START", "STOP", "R
 
 
 struct poll_config{
-    poll_t                      poll_type;
+    char *                      local_optarg;
+    uint32_t                    msr;
+    uint16_t                    flags;
+    struct timespec             interval;
     cpu_set_t                   control_cpu;
     cpu_set_t                   polled_cpu;
     size_t                      total_ops;      // 1 cpu x 1024 polls/sec * expected seconds
