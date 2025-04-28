@@ -8,22 +8,18 @@
 #include <time.h>       // struct timespec
 #include "string_utils.h"
 
-#if __LP64__            // long ints and pointers are 64 bits, ints are 32 bits.
-                        // https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+// Recall that a [un]signed long long is guaranteed to be at least 64 bits, and
+// a [un]signed long will either be at least 64 bits (LP64) or at least 32 bits.
+// If we want a 32-bit value, use strto[u]ll, check the range, and make the cast.
 
 uint64_t strtouint64_t( const char *restrict nptr, char **restrict endptr, int base ){
     return strtoull( nptr, endptr, base );
 }
 uint32_t strtouint32_t( const char *restrict nptr, char **restrict endptr, int base ){
-    return (uint32_t) strtoull( nptr, endptr, base );
+    uint64_t value = strtoull( nptr, endptr, base );
+    assert( value <= (( 1ULL << 32 ) - 1) );
+    return (uint32_t) value;
 }
-int64_t strtoint64_t( const char *restrict nptr, char **restrict endptr, int base ){
-    return strtoll( nptr, endptr, base );
-}
-int32_t strtoint32_t( const char *restrict nptr, char **restrict endptr, int base ){
-    return (uint32_t) strtoll( nptr, endptr, base );
-}
-#endif //__LP64__
 
 
 unsigned long long safe_strtoull( const char * restrict s ){
