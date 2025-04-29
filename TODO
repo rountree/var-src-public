@@ -44,6 +44,7 @@ Update options dump
 
 Need to have a "last op" marker and check for it during polling.
 
-Unused fields get printed out.
+Unused fields get printed out, but that's not needed.
 
+Polling doesn't understand the DELTA_* ops yet.
 

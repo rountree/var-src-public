@@ -673,7 +673,7 @@ void dump_batches( struct job *job ){
             assert( job->polls[i]->total_ops > 2 );
 
             // For each op....
-            for( size_t o = 1; o < job->polls[i]->total_ops; o++ ){
+            for( size_t o = 1; o < job->polls[i]->total_ops; o++ ){ // FIXME This o=1 has to go when we do multi-cpu polls.
                 // ...for each field...
                 for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
                     // ...print the data in that field.
@@ -742,7 +742,7 @@ uint16_t parse_flags( const char * const s ){
         else if( 0 == strcmp( "DELTA_THERM",   token ) ){ flags |= DELTA_THERM;     }
         else if( 0 == strcmp( "DELTA_PTHERM",  token ) ){ flags |= DELTA_PTHERM;    }
         else if( 0 == strcmp( "DELTA_MSRDATA", token ) ){ flags |= DELTA_MSRDATA;   }
-        token = strtok_r( NULL, "|", &endptr );
+        token = strtok_r( NULL, "+", &endptr );
     }
     free( local_str );
     return flags;
