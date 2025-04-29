@@ -42,6 +42,8 @@ Replace asserts with intelligible error messages.
 
 Update options dump
 
+Need to have a "last op" marker and check for it during polling.
 
+Unused fields get printed out.
 
 

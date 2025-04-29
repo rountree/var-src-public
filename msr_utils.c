@@ -14,7 +14,7 @@
 #include "msr_version.h"    // MSR_SAFE_VERSION_u32
 #include "cpuset_utils.h"   // get_next_cpu()
 #include "msr_utils.h"
-#include "string_utils.h"   // timspec_division()
+#include "string_utils.h"   // timespec_division()
 
 #define EXTRACT_TEMPERATURE(x) ( (x>>16) & 0x7fULL )
 #define UNUSED_OP ((__s32)(0xDECAFBAD))
@@ -614,26 +614,69 @@ void dump_batches( struct job *job ){
         //cleanup_poll_data( job ); FIXME
         //print_summaries( job );   FIXME
         printf( "# Dumping poll batches\n");
+
+        // Raw dump
         for( size_t i = 0; i < job->poll_count; i++ ){
 
-            // Open up a bunch of files.
+            static char filename[2048];
+            snprintf( filename, 2047, "./poll_%zu.raw", i );
+            int fd = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
+            assert( -1 != fd );
+            dprintf( fd, "cpu op err poll_max msr wmask msrdata msrdata2 tsc mperf aperf therm ptherm tag\n" );
+            for( size_t o = 0; o < job->polls[i]->total_ops; o++ ){
+                dprintf( fd, "%"PRIu16" ",  (uint16_t) job->polls[i]->poll_ops[o].cpu );
+                dprintf( fd, "%"PRIu16" ",  (uint16_t) job->polls[i]->poll_ops[o].op  );
+                dprintf( fd, "%"PRId32" ",  ( int32_t) job->polls[i]->poll_ops[o].err );
+                dprintf( fd, "%"PRIu32" ",  (uint32_t) job->polls[i]->poll_ops[o].poll_max );
+                dprintf( fd, "%#"PRIx32" ", (uint32_t) job->polls[i]->poll_ops[o].msr );
+                dprintf( fd, "%#"PRIx64" ", (uint64_t) job->polls[i]->poll_ops[o].wmask );
+                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].msrdata );
+                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].msrdata2 );
+                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].tsc );
+                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].mperf );
+                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].aperf );
+                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].therm );
+                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].ptherm );
+                dprintf( fd, "%"PRIu64   ,  (uint64_t) job->polls[i]->poll_ops[o].tag );
+                dprintf( fd, "\n" );
+            }
+            close(fd);
+        }
+
+        // Nicer dump
+        // For each poll...
+        for( size_t i = 0; i < job->poll_count; i++ ){
+
             static char filename[2048];
             int fd[ op_field_arridx_MAX_IDX ];
+
+            // ...for each array index...
             for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
-                snprintf( filename, 2047, "./poll_%s.out", job->polls[i]->local_optarg );
+
+                // ...create a file based on the poll and array index name....
+                snprintf( filename, 2047, "./poll_%zu_%s_%s.out", i, opfield2str[ arridx ], job->polls[i]->local_optarg );
+
+                // ...create that file...
                 fd[ arridx ] = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
                 if( fd[ arridx ] < 0 ){
                     perror("");
                     fprintf( stderr, "%s:%d:%s Error opening file %s.  Bye!\n", __FILE__, __LINE__, __func__, filename );
                     exit(-1);
                 }
+
+                // ...and print a header to it.
                 print_header( fd[ arridx ], 1ULL << arridx );
             }
+
             // Probably faster to visit each operation once.
             // Note that we start with the second poll value to make the deltas work.
             assert( job->polls[i]->total_ops > 2 );
+
+            // For each op....
             for( size_t o = 1; o < job->polls[i]->total_ops; o++ ){
+                // ...for each field...
                 for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
+                    // ...print the data in that field.
                     print_op( fd[ arridx ], 1ULL << arridx, &(job->polls[i]->poll_ops[o]), &(job->polls[i]->poll_ops[ o-1 ]), true );
                 }
             }
@@ -683,7 +726,7 @@ uint16_t parse_flags( const char * const s ){
     char *local_str = strdup( s );
     uint16_t flags = 0;
     char *endptr;
-    char *token  = strtok_r( local_str, "|", &endptr );
+    char *token  = strtok_r( local_str, "+", &endptr );
     while( NULL != token ){
         if(      0 == strcmp( "OP_WRITE",      token ) ){ flags |= OP_WRITE;        }
         else if( 0 == strcmp( "OP_READ",       token ) ){ flags |= OP_READ;         }

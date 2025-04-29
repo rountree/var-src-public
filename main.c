@@ -83,6 +83,7 @@ void* poll_thread_start( void *v ){
             perror("");
             exit(-1);
         }
+        nanosleep( &job.polls[i]->interval, NULL );
     }
     close( fd );
     return 0;
