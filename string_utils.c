@@ -109,3 +109,10 @@ void str2timespec( const char * const restrict s, struct timespec *t ){
     }
 }
 
+// Yeah, this doesn't really belong in string_utils...
+size_t timespec_division( const struct timespec * const restrict numerator, const struct timespec * const restrict denominator ){
+    // Overflow shouldn't be an issue so long as sizeof(size_t) == 8.
+    size_t n = numerator->tv_sec   * 1'000'000'000ULL + numerator->tv_nsec;
+    size_t d = denominator->tv_sec * 1'000'000'000ULL + denominator->tv_nsec;
+    return n/d;
+}

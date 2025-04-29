@@ -14,6 +14,7 @@
 #include "msr_version.h"    // MSR_SAFE_VERSION_u32
 #include "cpuset_utils.h"   // get_next_cpu()
 #include "msr_utils.h"
+#include "string_utils.h"   // timspec_division()
 
 #define EXTRACT_TEMPERATURE(x) ( (x>>16) & 0x7fULL )
 #define UNUSED_OP ((__s32)(0xDECAFBAD))
@@ -261,14 +262,11 @@ static void setup_polling_batches( struct job *job ){
 
     // Map the polling batches
     for( size_t i = 0; i < job->poll_count; i++ ){
-        // Assume msrs being polled will be updated 1k times/second.
-        // FIXME the above assumption no longer holds.
         // One op per batch, and (for now) one cpu per batch.
-        job->polls[i]->total_ops = 1024 * job->duration.tv_sec;
-        job->polls[i]->poll_batches = calloc( job->polls[i]->total_ops, sizeof( struct msr_batch_array ) );
-        assert( job->polls[i]->poll_batches );
-        job->polls[i]->poll_ops = calloc( job->polls[i]->total_ops, sizeof( struct msr_batch_op ) );
-        assert( job->polls[i]->poll_ops );
+        job->polls[i]->total_ops = timespec_division( &job->duration, &job->polls[i]->interval );
+
+        job->polls[i]->poll_batches = calloc( job->polls[i]->total_ops, sizeof( struct msr_batch_array ) ); assert( job->polls[i]->poll_batches );
+        job->polls[i]->poll_ops     = calloc( job->polls[i]->total_ops, sizeof( struct msr_batch_op ) );    assert( job->polls[i]->poll_ops );
 
         // Find the polled cpu.
         uint16_t polled_cpu = (uint16_t)( get_next_cpu( 0, max_msrsafe_cpu, &(job->polls[i]->polled_cpu) ) );
