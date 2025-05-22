@@ -121,26 +121,31 @@ static void print_options( int argc, char **argv, struct job *job ){
         fprintf_timespec( fp, &job->polls[i]->interval );
         fprintf(          fp, "\n");
     }
-/*
+
+    fprintf( fp, "\n" );
+
     // benchmarks
     for( size_t i = 0; i < job->benchmark_count; i++ ){
-        printf("# benchmark %zu of %zu:  type=%s. parameters=%#"PRIx64", %#"PRIx64", %#"PRIx64".\n",
+        fprintf( fp, "# benchmark %zu of %zu:  type=%s. parameters=%#"PRIx64", %#"PRIx64", %#"PRIx64".\n",
                 i+1, job->benchmark_count, benchmarktype2str[ job->benchmarks[i]->benchmark_type ],
                 job->benchmarks[i]->benchmark_param1,
                 job->benchmarks[i]->benchmark_param2,
                 job->benchmarks[i]->benchmark_param3 );
-        printf("#          execution cpu id(s):  ");
-        print_cpuset( &job->benchmarks[i]->execution_cpu );
+        fprintf( fp, "#\texecution cpu id(s):  ");
+        fprintf_cpuset( fp, &job->benchmarks[i]->execution_cpu );
+        fprintf( fp, "\n" );
     }
+
+    fprintf( fp, "\n" );
 
     // longitudinals
     for( size_t i = 0; i < job->longitudinal_count; i++ ){
-        printf("# longitudinal %zu of %zu:  type=%s.\n",
+        fprintf(fp, "# longitudinal %zu of %zu:  type=%s.\n",
                 i, job->longitudinal_count, longitudinaltype2str[ job->longitudinals[i]->longitudinal_type ]);
-        printf("#          sample cpus:  ");
-        print_cpuset( &job->longitudinals[i]->sample_cpus );
+        fprintf(fp, "#\tsample cpus:  ");
+        fprintf_cpuset( fp, &job->longitudinals[i]->sample_cpus );
+        fprintf(fp, "\n");
     }
-*/
     fclose(fp);
 }
 

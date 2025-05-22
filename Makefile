@@ -32,7 +32,7 @@ LDFLAGS=-lpthread
 CFLAGS+=-O2
 
 vanallin: Makefile cpuset_utils.o msr_utils.o options.o spin.o main.o timespec_utils.o int_utils.o
-	$(CC) $(LDFLAGS) string_utils.o cpuset_utils.o msr_utils.o options.o spin.o main.o -o var
+	$(CC) $(LDFLAGS) cpuset_utils.o msr_utils.o options.o spin.o main.o timespec_utils.o int_utils.o -o var
 
 clean:
 	rm -f *.o var
