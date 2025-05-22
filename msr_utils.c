@@ -9,7 +9,6 @@
 #include <stdio.h>          // printf(3), perror(3)
 #include <sys/ioctl.h>      // ioctl(2)
 #include <errno.h>          // errno
-#define MSR_SAFE_USERSPACE  // Pick up some typedefs and enums useful for printing ops
 #include "msr_version.h"    // MSR_SAFE_VERSION_u32
 #include "cpuset_utils.h"   // get_next_cpu()
 #include "msr_utils.h"

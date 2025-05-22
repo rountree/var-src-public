@@ -14,8 +14,8 @@
 #include "timespec_utils.h"
 
 static void print_help( void ){
-    printf( "vanallin [options]\n" );
-    printf( "  Version %"PRIu64".\n", vanallin_version );
+    printf( "var [options]\n" );
+    printf( "  Version %"PRIu64".\n", var_version );
     printf( "  Built %s, %s.\n", __DATE__, __TIME__ );
     printf( "\n");
     printf( "Options:\n" );
@@ -59,9 +59,18 @@ static void print_help( void ){
     printf( "  to nanoseconds, microseconds, milliseconds, seconds, minutes, or hours,\n");
     printf( "  respectively.  The absence of a suffix implies seconds.\n");
     printf( "\n");
-    printf( "The msr_safe.h header describes the bitfields that can be OR'ed together\n");
-    printf( "  for the .op field of struct msr_batch_op.  The <flags> field allows the\n");
-    printf( "  user to specify these flags directly.\n");
+    printf( "The <flags> field can be any of the following, possibly OR'd together with '+'.\n");
+    printf( "\n");
+    for( uint16_t i = 1; i < MAX_OP_VAL; ){
+        printf("\t");
+        for( size_t j = 0; j < 4 && i < MAX_OP_VAL; j++, i *= 2 ){
+            printf("%-15s", opflags2str[ i ]);
+        }
+        printf("\n");
+    }
+    printf( "\n");
+    printf( "  For example, polling a register and capturing the core and processor\n");
+    printf( "  temperature would be expressed by OP_POLL+OP_THERM+OP_PTHERM.\n");
 }
 
 static void print_options( int argc, char **argv, struct job *job ){
@@ -456,7 +465,7 @@ void parse_options( int argc, char **argv, struct job *job ){
                 break;
             }
             case 'v':   // version
-                printf( "  Version %"PRIu64".\n", vanallin_version );
+                printf( "  Version %"PRIu64".\n", var_version );
                 exit(0);
             case 'h':   // help
                 print_help();

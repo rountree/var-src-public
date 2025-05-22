@@ -1,6 +1,8 @@
 #pragma once
 #include "job.h"
+#define MSR_SAFE_USERSPACE
 #include "msr_safe.h"
+#undef MSR_SAFE_USERSPACE
 
 void setup_msrsafe_batches( struct job *job );
 void teardown_msrsafe_batches( struct job *job );
