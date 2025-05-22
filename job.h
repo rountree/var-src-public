@@ -64,22 +64,29 @@ struct longitudinal_config{
 
 
 struct job{
-    cpu_set_t                   main_cpu;
 
+    // Job
+    cpu_set_t                   main_cpu;
+    struct timespec             duration;           // (seconds:nanoseconds) main sleeps this long (nanosleep is thread-safe).
+    bool                        ab_randomized;      // If true, randomly select whether to run A or B next.  False alternates.
+    struct timespec             ab_duration;        // (seconds:nanoseconds) how long each A|B instance executes.
+
+    // Internal
+    volatile bool               halt;               // The big red off button.
+    volatile bool               ab_selector;
+
+    // Polls
     struct poll_config          **polls;
     size_t                      poll_count;         // The number of -p/--poll options parsed on the command line.
 
+    // Benchmarks
     struct benchmark_config     **benchmarks;
     size_t                      benchmark_count;    // The number of -b/--benchmark options parsed on the command line.
 
+    // Longitudinals
     struct longitudinal_config  **longitudinals;
     size_t                      longitudinal_count; // The number of -l/--longitudinal options parsed on the command line.
 
-    struct timespec             duration;           // (seconds:nanoseconds) main sleeps this long (nanosleep is thread-safe).
-    volatile bool               halt;               // The big red off button.
-    volatile bool               ab_selector;
-    bool                        ab_randomized;      // If true, randomly select whether to run A or B next.  False alternates.
-    struct timespec             ab_duration;        // (seconds:nanoseconds) how long each A|B instance executes.
 
 };
 

@@ -10,11 +10,11 @@
 #include <sys/ioctl.h>      // ioctl(2)
 #include <errno.h>          // errno
 #define MSR_SAFE_USERSPACE  // Pick up some typedefs and enums useful for printing ops
-#include "msr_safe.h"       // struct msr_batch_array, struct msr_batch_op, X86_IOC_MSR_BATCH
 #include "msr_version.h"    // MSR_SAFE_VERSION_u32
 #include "cpuset_utils.h"   // get_next_cpu()
 #include "msr_utils.h"
-#include "string_utils.h"   // timespec_division()
+#include "int_utils.h"
+#include "timespec_utils.h" // timespec_division()
 
 #define EXTRACT_TEMPERATURE(x) ( (x>>16) & 0x7fULL )
 #define UNUSED_OP ((__s32)(0xDECAFBAD))
@@ -722,7 +722,7 @@ void run_longitudinal_batches( struct job *job, longitudinal_slot_t slot_idx ){
     }
 }
 
-uint16_t parse_flags( const char * const s ){
+op_flag_t str2flags( const char * const s ){
     char *local_str = strdup( s );
     uint16_t flags = 0;
     char *endptr;
@@ -747,4 +747,34 @@ uint16_t parse_flags( const char * const s ){
     free( local_str );
     return flags;
 }
+
+char* flags2str( op_flag_t flags ){
+
+    char *str = calloc( 1024, 1 );
+    bool isFirst = true;
+    for( op_flag_t i = 1; i < MAX_OP_VAL; i *= 2 ){
+        if( flags & i ){
+            if( !isFirst ){
+                strcat( str, " " );
+            }
+            strcat( str, opflags2str[ i ] );
+            isFirst = false;
+        }
+    }
+    return str;
+}
+
+void dprintf_flags( int fd, op_flag_t flags ){
+    char *str = flags2str( flags );
+    dprintf( fd, "%s", str );
+    free(str);
+}
+
+void fprintf_flags( FILE *fp, op_flag_t flags ){
+    char *str = flags2str( flags );
+    fprintf( fp, "%s", str );
+    free(str);
+}
+
+
 

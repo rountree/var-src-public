@@ -7,10 +7,12 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include "job.h"
-#include "string_utils.h"       // safe_strtoull()
+#include "int_utils.h"          // safe_strtoull()
 #include "cpuset_utils.h"       // str2cpuset()
 #include "version.h"
-#include "msr_utils.h"          // parse_flags()
+#include "msr_utils.h"
+#include "timespec_utils.h"
+
 static void print_help( void ){
     printf( "vanallin [options]\n" );
     printf( "  Version %"PRIu64".\n", vanallin_version );
@@ -62,30 +64,68 @@ static void print_help( void ){
     printf( "  user to specify these flags directly.\n");
 }
 
-#if 0
-static void print_parameters( struct job *job ){
+static void print_options( int argc, char **argv, struct job *job ){
 
-    printf("# %s:%d:%s\n# %d main cpu(s):  ", __FILE__, __LINE__, __func__, CPU_COUNT( &job->main_cpu ) );
-    print_cpuset( &job->main_cpu );
-    printf("#\n");
-    printf("# %zu polls, %zu benchmarks, %zu longitudinals.  duration = %ld.\n",
-            job->poll_count, job->benchmark_count, job->longitudinal_count,
-            job->duration.tv_sec );
+    FILE *fp = fopen( "job.out", "w" );
+    assert( NULL != fp );
+
+    // command line
+    fprintf( fp, "# Command line:\n" );
+    fprintf( fp, "#\t" );
+    for( int i = 0; i < argc; i++ ){
+        fprintf( fp, " %s", argv[i] );
+    }
+    fprintf( fp, "\n" );
+
+    // main_cpu
+    fprintf(        fp, "# main_cpu: " );
+    fprintf_cpuset( fp, &job->main_cpu );
+    fprintf(        fp, "\n");
+
+    // duration
+    fprintf(          fp, "# duration: ");
+    fprintf_timespec( fp, &job->duration );
+    fprintf(          fp, "\n");
+
+    // a|b randomized
+    fprintf( fp, "# a|b randomized:  %s\n", job->ab_randomized ? "True" : "False" );
+
+    // a|b duration
+    fprintf(          fp, "# a|b duration: " );
+    fprintf_timespec( fp, &job->ab_duration );
+    fprintf(          fp, "\n");
+
+    // counts
+    fprintf( fp, "# %zu polls, %zu benchmarks, %zu longitudinals.\n",
+            job->poll_count, job->benchmark_count, job->longitudinal_count );
 
     // polls
     for( size_t i = 0; i < job->poll_count; i++ ){
-        printf("# poll %zu of %zu:  type=%s.\n",
-                i, job->poll_count, polltype2str[ job->polls[i]->poll_type ]);
-        printf("#          sample cpus:  ");
-        print_cpuset( &job->polls[i]->polled_cpu );
-        printf("#          control cpu:  ");
-        print_cpuset( &job->polls[i]->control_cpu );
-    }
+        fprintf(          fp, "# poll %zu of %zu\n", i+1, job->poll_count);
 
+        fprintf(          fp, "#\tsample cpus:  ");
+        fprintf_cpuset(    fp, &job->polls[i]->polled_cpu );
+        fprintf(          fp, "\n" );
+
+        fprintf(          fp, "#\tcontrol cpu:  ");
+        fprintf_cpuset(    fp, &job->polls[i]->control_cpu );
+        fprintf(          fp, "\n" );
+
+        fprintf(          fp, "#\tmsr: %#"PRIx32"\n", job->polls[i]->msr );
+
+        fprintf(          fp, "#\tflags: ");
+        fprintf_flags(    fp, job->polls[i]->flags );
+        fprintf(          fp, "\n");
+
+        fprintf(          fp, "#\tinterval: ");
+        fprintf_timespec( fp, &job->polls[i]->interval );
+        fprintf(          fp, "\n");
+    }
+/*
     // benchmarks
     for( size_t i = 0; i < job->benchmark_count; i++ ){
         printf("# benchmark %zu of %zu:  type=%s. parameters=%#"PRIx64", %#"PRIx64", %#"PRIx64".\n",
-                i, job->benchmark_count, benchmarktype2str[ job->benchmarks[i]->benchmark_type ],
+                i+1, job->benchmark_count, benchmarktype2str[ job->benchmarks[i]->benchmark_type ],
                 job->benchmarks[i]->benchmark_param1,
                 job->benchmarks[i]->benchmark_param2,
                 job->benchmarks[i]->benchmark_param3 );
@@ -100,8 +140,10 @@ static void print_parameters( struct job *job ){
         printf("#          sample cpus:  ");
         print_cpuset( &job->longitudinals[i]->sample_cpus );
     }
+*/
+    fclose(fp);
 }
-#endif 
+
 void parse_options( int argc, char **argv, struct job *job ){
     // Default values:
     job->duration.tv_sec     = 10;
@@ -390,7 +432,7 @@ void parse_options( int argc, char **argv, struct job *job ){
 
                 // Fill in the struct
                 pll->msr = (uint32_t)safe_strtoull( pll_msr_str );
-                pll->flags = (uint16_t)parse_flags( pll_flags_str );
+                pll->flags = str2flags( pll_flags_str );
                 str2timespec( pll_timespec_str, &pll->interval );
                 str2cpuset( pll_polled_cpuset_str, &pll->polled_cpu );
                 str2cpuset( pll_control_cpuset_str, &pll->control_cpu );
@@ -425,6 +467,6 @@ void parse_options( int argc, char **argv, struct job *job ){
 
     //cpuset_checks( job );
 
-    //print_parameters( job );
+    print_options( argc, argv, job );
 
 }

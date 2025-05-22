@@ -23,7 +23,7 @@
 //
 #include "job.h"                // Defines the job struct and the tasks it can contain.
 #include "cpuset_utils.h"       // str2cpuset()
-#include "string_utils.h"       // safe_strtoull()
+#include "int_utils.h"          // safe_strtoull()
 #include "msr_utils.h"          // setup_msrsafe_batches()
 #include "options.h"            // parse_options()
 

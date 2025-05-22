@@ -4,9 +4,9 @@
 #include <stdio.h>          // printf(3)
 #include <string.h>         // strtok_r(3), strchr(3)
 #include "cpuset_utils.h"
-#include "string_utils.h"   //
+#include "int_utils.h"      //
 
-void cpu2cpuset( const int cpu, cpu_set_t * const cpuset ){
+void cpu2cpuset( int cpu, cpu_set_t * const cpuset ){
 
     CPU_ZERO( cpuset );
     CPU_SET( cpu, cpuset );
@@ -98,7 +98,12 @@ unsigned int get_next_cpu( unsigned int start_cpu, unsigned int max_cpu, cpu_set
     return 0;
 }
 
-void print_cpuset( cpu_set_t *cpus ){
+char * cpuset2str( cpu_set_t *cpus ){
+    /* FIXME:  This could stand to be a bit more robust. */
+    const size_t max_str_len = 1024;
+    char * str = calloc( max_str_len, 1 );
+    char * ptr = str;
+
     int count = CPU_COUNT( cpus );
     int lo_cpu = 0, hi_cpu = 0;
     while( count > 0 ){
@@ -112,7 +117,7 @@ void print_cpuset( cpu_set_t *cpus ){
                 }
             }
             // Always print lo_cpu
-            printf("%d", lo_cpu);
+            ptr += sprintf(ptr, "%d", lo_cpu);
 
             // Use range notation for 3 or more consecutive "set" cpus.
             if( hi_cpu - lo_cpu > 2 ){
@@ -125,9 +130,25 @@ void print_cpuset( cpu_set_t *cpus ){
             }
 
             // Controls if there's a following comma
-            printf( "%s", ( count > 0 ) ? ", " : "\n" );
+            ptr += sprintf( ptr, "%s", ( count > 0 ) ? ", " : "\n" );
         }else{
             lo_cpu++;
         }
     }
+    return str;
 }
+
+
+void dprintf_cpuset( int fd, cpu_set_t *cpus ){
+    char * str = cpuset2str( cpus );
+    dprintf( fd, "%s", str );
+    free( str );
+}
+
+void fprintf_cpuset( FILE *fp, cpu_set_t *cpus ){
+    char * str = cpuset2str( cpus );
+    fprintf( fp, "%s", str );
+    free( str );
+}
+
+

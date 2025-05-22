@@ -31,7 +31,7 @@ LDFLAGS=-lpthread
 # Production
 CFLAGS+=-O2
 
-vanallin: Makefile string_utils.o cpuset_utils.o msr_utils.o options.o spin.o main.o
+vanallin: Makefile cpuset_utils.o msr_utils.o options.o spin.o main.o timespec_utils.o int_utils.o
 	$(CC) $(LDFLAGS) string_utils.o cpuset_utils.o msr_utils.o options.o spin.o main.o -o var
 
 clean:
