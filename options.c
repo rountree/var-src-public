@@ -450,17 +450,6 @@ void parse_options( int argc, char **argv, struct job *job ){
                 str2timespec( pll_timespec_str, &pll->interval );
                 str2cpuset( pll_polled_cpuset_str, &pll->polled_cpu );
                 str2cpuset( pll_control_cpuset_str, &pll->control_cpu );
-
-                fprintf( stderr, "#####################\n" );
-                fprintf( stderr, "# Parsed %s\n", pll->local_optarg );
-                fprintf( stderr, "#\tpoll_count       = %zu\n", job->poll_count );
-                fprintf( stderr, "#\tmsr              = %#0x\n", pll->msr );
-                fprintf( stderr, "#\tflags            = %#0x\n", pll->flags );
-                fprintf( stderr, "#\tcontrol cpu      = %d\n", get_next_cpu( 0, 255, &pll->control_cpu ) );
-                fprintf( stderr, "#\tpolled cpu       = %d\n", get_next_cpu( 0, 255, &pll->polled_cpu  ) );
-                fprintf( stderr, "#\tinterval.tv_sec  = %"PRIu64"\n", pll->interval.tv_sec );
-                fprintf( stderr, "#\tinterval.tv_nsec = %"PRIu64"\n", pll->interval.tv_nsec );
-
                 free(local_optarg);
                 break;
             }
@@ -474,13 +463,5 @@ void parse_options( int argc, char **argv, struct job *job ){
         }; // switch
     };
 
-    fprintf( stderr, "#####################\n" );
-    fprintf( stderr, "# duration.tv_sec  = %"PRIu64"\n", job->duration.tv_sec );
-    fprintf( stderr, "# duration.tv_nsec = %"PRIu64"\n", job->duration.tv_nsec );
-    fprintf( stderr, "#####################\n" );
-
-    //cpuset_checks( job );
-
     print_options( argc, argv, job );
-
 }
