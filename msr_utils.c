@@ -653,7 +653,7 @@ void dump_batches( struct job *job ){
             for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
 
                 // ...create a file based on the poll and array index name....
-                snprintf( filename, 2047, "./poll_%zu_%s_%s.out", i, opfield2str[ arridx ], job->polls[i]->local_optarg );
+                snprintf( filename, 2047, "./poll_%zu_%s_%#"PRIx32".out", i, opfield2str[ arridx ], job->polls[i]->msr );
 
                 // ...create that file...
                 fd[ arridx ] = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
