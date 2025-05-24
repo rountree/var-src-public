@@ -65,11 +65,8 @@ typedef enum : uint64_t{
     PM_ENABLE                        = 0x0770,
     HWP_CAPABILITIES                 = 0x0771,
 }msr_t;
-
-// This wastes an extravagant amount of memory if the compiler isn't optimizing
-// based on the double const.  Use constexpr?
 #if 0
-This should be coming out of an msr header file.
+// This is an extravagence.
 static const char * const msr2str[] = {
        [TIME_STAMP_COUNTER]                = "TIME_STAMP_COUNTER",
        [MISC_PACKAGE_CTLS]                 = "MISC_PACKAGE_CTLS",
@@ -112,7 +109,6 @@ static const char * const msr2str[] = {
        [HWP_CAPABILITIES]                  = "HWP_CAPABILITIES",
 };
 #endif
-
 //////////////////////////////////////////////////////////////////////////////////
 // Allowlist.
 //////////////////////////////////////////////////////////////////////////////////
@@ -208,12 +204,17 @@ static const struct msr_batch_op * const fixed_function_counters__teardown[] = {
     NULL };
 
 // ENERGY_COUNTERS
+// Best-practice for performance counters is to do a lightweight "stop" and
+//   then read out the values.  Energy counters don't have a "stop," and their
+//   update rates are relatively slow.  Doing the read during the "stop" phase
+//   eliminates a bit of measurement contamination.  Reading during the "read"
+//   phase leads to less confusion.  Prefer the latter.
 static const struct msr_batch_op * const energy_counters__setup[] = { &op_rd_RAPL_POWER_UNIT, NULL };
 static const struct msr_batch_op * const energy_counters__start[] = {
     &op_rd_PKG_ENERGY_STATUS, &op_rd_DRAM_ENERGY_STATUS, &op_rd_PP0_ENERGY_STATUS, &op_rd_PP1_ENERGY_STATUS, &op_rd_PLATFORM_ENERGY_COUNTER, NULL };
-static const struct msr_batch_op * const energy_counters__stop[] = {
+static const struct msr_batch_op * const energy_counters__stop[] = { NULL };
+static const struct msr_batch_op * const energy_counters__read[] = {
     &op_rd_PKG_ENERGY_STATUS, &op_rd_DRAM_ENERGY_STATUS, &op_rd_PP0_ENERGY_STATUS, &op_rd_PP1_ENERGY_STATUS, &op_rd_PLATFORM_ENERGY_COUNTER, NULL };
-static const struct msr_batch_op * const energy_counters__read[] = { NULL };
 static const struct msr_batch_op * const energy_counters__teardown[] = { NULL };
 
 static const struct msr_batch_op * const * const fixed_function_counters__ops[ NUM_LONGITUDINAL_EXECUTION_SLOTS ] = {
@@ -594,6 +595,27 @@ void dump_batches( struct job *job ){
                     perror("");
                     fprintf( stderr, "%s:%d:%s Error opening file %s.  Bye!\n", __FILE__, __LINE__, __func__, filename );
                     exit(-1);
+                }
+
+                if( slot_idx == READ ){
+                    switch( job->longitudinals[i]->longitudinal_type ){
+                        case FIXED_FUNCTION_COUNTERS:
+                            dprintf( fd, "# 0x0309 FIXED_CTR0 (INST_RETIRED.ANY)\n");
+                            dprintf( fd, "# 0x030a FIXED_CTR1 (CPU_CLK_UNHALTED)\n");
+                            dprintf( fd, "# 0x030b FIXED_CTR2 (CPU_CLK_UNHALTED.REF_TSC)\n");
+                            break;
+                        case ENERGY_COUNTERS:
+                            dprintf( fd, "# 0x0606 RAPL_POWER_UNIT\n" );
+                            dprintf( fd, "# 0x0611 PKG_ENERGY_STATUS\n" );
+                            dprintf( fd, "# 0x0619 DRAM_ENERGY_STATUS\n" );
+                            dprintf( fd, "# 0x0639 PP0_ENERGY_STATUS\n" );
+                            dprintf( fd, "# 0x0641 PP1_ENERGY_STATUS\n" );
+                            dprintf( fd, "# 0x064d PLATFORM_ENERGY_COUNTER\n" );
+                            break;
+                        default:
+                            assert(0);
+                            break;
+                    }
                 }
 
                 print_header( fd,op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC);
