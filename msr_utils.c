@@ -214,7 +214,7 @@ static const struct msr_batch_op * const energy_counters__start[] = {
     &op_rd_PKG_ENERGY_STATUS, &op_rd_DRAM_ENERGY_STATUS, &op_rd_PP0_ENERGY_STATUS, &op_rd_PP1_ENERGY_STATUS, &op_rd_PLATFORM_ENERGY_COUNTER, NULL };
 static const struct msr_batch_op * const energy_counters__stop[] = { NULL };
 static const struct msr_batch_op * const energy_counters__read[] = {
-    &op_rd_PKG_ENERGY_STATUS, &op_rd_DRAM_ENERGY_STATUS, &op_rd_PP0_ENERGY_STATUS, &op_rd_PP1_ENERGY_STATUS, &op_rd_PLATFORM_ENERGY_COUNTER, NULL };
+    &op_rd_RAPL_POWER_UNIT, &op_rd_PKG_ENERGY_STATUS, &op_rd_DRAM_ENERGY_STATUS, &op_rd_PP0_ENERGY_STATUS, &op_rd_PP1_ENERGY_STATUS, &op_rd_PLATFORM_ENERGY_COUNTER, NULL };
 static const struct msr_batch_op * const energy_counters__teardown[] = { NULL };
 
 static const struct msr_batch_op * const * const fixed_function_counters__ops[ NUM_LONGITUDINAL_EXECUTION_SLOTS ] = {
