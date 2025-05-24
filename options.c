@@ -30,7 +30,7 @@ static void print_help( void ){
     printf( "  -p / --poll=<msr_address>:<flags>:<timespec>:<control_cpu>:<sample_cpu>\n");
     printf( "\n");
     printf( "  -R / --abRandomized (enables random a|b selection)\n");
-    printf( "  -T / --abTime=<seconds>:<milliseconds (default is 1 second)\n");
+    printf( "  -T / --abTime=<timespec> (default is 1 second)\n");
     printf( "\n");
     printf( "The available benchmarks are SPIN, and ABSHIFT.\n");
     printf( "\n");
@@ -87,51 +87,56 @@ static void print_options( int argc, char **argv, struct job *job ){
     fprintf( fp, "\n#\n" );
 
     // main_cpu
-    fprintf(        fp, "# main_cpu: " );
+    fprintf(        fp, "#\t%-20s", "main_cpu: " );
     fprintf_cpuset( fp, &job->main_cpu );
     fprintf(        fp, "\n");
 
     // duration
-    fprintf(          fp, "# duration: ");
+    fprintf(          fp, "#\t%-20s", "duration: " );
     fprintf_timespec( fp, &job->duration );
     fprintf(          fp, "\n");
 
     // a|b randomized
-    fprintf( fp, "# a|b randomized:  %s\n", job->ab_randomized ? "True" : "False" );
+    fprintf( fp, "#\t%-20s%s\n", "a|b randomized: ", job->ab_randomized ? "True" : "False" );
 
     // a|b duration
-    fprintf(          fp, "# a|b duration: " );
+    fprintf(          fp, "#\t%-20s", "a|b duration: " );
     fprintf_timespec( fp, &job->ab_duration );
-    fprintf(          fp, "\n");
+    fprintf(          fp, "\n#\n");
 
     // counts
-    fprintf( fp, "# %zu polls, %zu benchmarks, %zu longitudinals.\n",
-            job->poll_count, job->benchmark_count, job->longitudinal_count );
+    fprintf( fp, "# %zu %s, %zu %s, %zu %s.\n#\n",
+            job->poll_count,
+            job->poll_count == 1 ? "poll" : "polls",
+            job->benchmark_count,
+            job->benchmark_count == 1 ? "benchmark" : "benchmarks",
+            job->longitudinal_count,
+            job->longitudinal_count == 1 ? "longitudinal" : "longitudinals");
 
     // polls
     for( size_t i = 0; i < job->poll_count; i++ ){
         fprintf(          fp, "# poll %zu of %zu\n", i+1, job->poll_count);
 
-        fprintf(          fp, "#\tsample cpus:  ");
+        fprintf(          fp, "#\t%-15s", "sample cpu: ");
         fprintf_cpuset(    fp, &job->polls[i]->polled_cpu );
         fprintf(          fp, "\n" );
 
-        fprintf(          fp, "#\tcontrol cpu:  ");
+        fprintf(          fp, "#\t%-15s", "control cpu: ");
         fprintf_cpuset(    fp, &job->polls[i]->control_cpu );
         fprintf(          fp, "\n" );
 
-        fprintf(          fp, "#\tmsr: %#"PRIx32"\n", job->polls[i]->msr );
+        fprintf(          fp, "#\t%-15s%#"PRIx32"\n", "msr: ", job->polls[i]->msr );
 
-        fprintf(          fp, "#\tflags: ");
+        fprintf(          fp, "#\t%-15s", "flags: ");
         fprintf_flags(    fp, job->polls[i]->flags );
         fprintf(          fp, "\n");
 
-        fprintf(          fp, "#\tinterval: ");
+        fprintf(          fp, "#\t%-15s", "interval: ");
         fprintf_timespec( fp, &job->polls[i]->interval );
         fprintf(          fp, "\n");
     }
 
-    fprintf( fp, "\n" );
+    fprintf( fp, "#\n" );
 
     // benchmarks
     for( size_t i = 0; i < job->benchmark_count; i++ ){
@@ -140,18 +145,18 @@ static void print_options( int argc, char **argv, struct job *job ){
                 job->benchmarks[i]->benchmark_param1,
                 job->benchmarks[i]->benchmark_param2,
                 job->benchmarks[i]->benchmark_param3 );
-        fprintf( fp, "#\texecution cpu id(s):  ");
+        fprintf( fp, "#\texecution cpu:  ");
         fprintf_cpuset( fp, &job->benchmarks[i]->execution_cpu );
         fprintf( fp, "\n" );
     }
 
-    fprintf( fp, "\n" );
+    fprintf( fp, "#\n" );
 
     // longitudinals
     for( size_t i = 0; i < job->longitudinal_count; i++ ){
         fprintf(fp, "# longitudinal %zu of %zu:  type=%s.\n",
                 i, job->longitudinal_count, longitudinaltype2str[ job->longitudinals[i]->longitudinal_type ]);
-        fprintf(fp, "#\tsample cpus:  ");
+        fprintf(fp, "#\tsample cpu:  ");
         fprintf_cpuset( fp, &job->longitudinals[i]->sample_cpus );
         fprintf(fp, "\n");
     }
@@ -203,34 +208,7 @@ void parse_options( int argc, char **argv, struct job *job ){
             case 'T':     // a|b duration
             {
                 char *local_optarg = strdup( optarg );
-                char *saveptr = NULL;
-                char *seconds        = strtok_r( local_optarg, ":", &saveptr );
-                char *milliseconds   = strtok_r( NULL,         ":", &saveptr );
-                char *should_be_null = strtok_r( NULL,         ":", &saveptr );
-
-                if( NULL == seconds ){
-                    printf( "%s:%d:%s Parameter (%s) to -S/--ab_duration is missing <seconds>.\n",
-                            __FILE__, __LINE__, __func__, optarg);
-                    exit(-1);
-                }
-                if( NULL == milliseconds ){
-                    printf( "%s:%d:%s Parameter (%s) to -S/--ab_duration is missing <milliseconds>.\n",
-                            __FILE__, __LINE__, __func__, optarg);
-                    exit(-1);
-                }
-                if( NULL != should_be_null ){
-                    printf( "%s:%d:%s Extra parameters in -S/--ab_duration (%s).\n",
-                            __FILE__, __LINE__, __func__, optarg);
-                    exit(-1);
-                }
-
-                job->ab_duration.tv_sec  = safe_strtoull( seconds );
-                job->ab_duration.tv_nsec = safe_strtoull( milliseconds) * 1'000'000L;
-                if( job->ab_duration.tv_nsec > 999'999'999L ){
-                    printf( "%s:%d:%s Milliseconds term in -S/--ab_duration > 999.\n",
-                            __FILE__, __LINE__, __func__ );
-                    exit(-1);
-                }
+                str2timespec( local_optarg, &job->ab_duration );
                 free( local_optarg );
                 break;
             }
@@ -245,8 +223,10 @@ void parse_options( int argc, char **argv, struct job *job ){
                 break;
             }
             case 'm':   // main
+            {
                 str2cpuset( optarg, &job->main_cpu );
                 break;
+            }
             case 'l':   // longitudinal
             {
                 // Increment the number of longitudinal tasks.

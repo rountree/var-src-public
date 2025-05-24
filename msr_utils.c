@@ -579,7 +579,6 @@ void dump_batches( struct job *job ){
     if( job->longitudinal_count ){
 
         // longitudinals
-        printf( "# Dumping longitudinal batches\n");
         for( size_t i = 0; i < job->longitudinal_count; i++ ){
             for( longitudinal_slot_t slot_idx = 0; slot_idx < NUM_LONGITUDINAL_EXECUTION_SLOTS; slot_idx++ ){
                 if( NULL == job->longitudinals[i]->batches[ slot_idx ] ){
@@ -612,7 +611,6 @@ void dump_batches( struct job *job ){
         // polls
         //cleanup_poll_data( job ); FIXME
         //print_summaries( job );   FIXME
-        printf( "# Dumping poll batches\n");
 
         // Raw dump
         for( size_t i = 0; i < job->poll_count; i++ ){
