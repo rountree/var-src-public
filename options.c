@@ -84,7 +84,7 @@ static void print_options( int argc, char **argv, struct job *job ){
     for( int i = 0; i < argc; i++ ){
         fprintf( fp, " %s", argv[i] );
     }
-    fprintf( fp, "\n" );
+    fprintf( fp, "\n#\n" );
 
     // main_cpu
     fprintf(        fp, "# main_cpu: " );

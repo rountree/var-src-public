@@ -130,7 +130,7 @@ char * cpuset2str( cpu_set_t *cpus ){
             }
 
             // Controls if there's a following comma
-            ptr += sprintf( ptr, "%s", ( count > 0 ) ? ", " : "\n" );
+            ptr += sprintf( ptr, "%s", ( count > 0 ) ? ", " : "" );
         }else{
             lo_cpu++;
         }
