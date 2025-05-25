@@ -400,6 +400,11 @@ static void print_header( int fd, uint64_t op_bitfield ){
     return;
 }
 
+// Given a therm or ptherm values, extract and return bits 22:17.
+static int8_t get_temperature( uint64_t val ){
+    return (int8_t)( (val >> 17) & 0x3fULL );
+}
+
 static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, struct msr_batch_op *prev, bool skip_unused ){
 
     if( ( o->err == UNUSED_OP ) && skip_unused ){
@@ -434,14 +439,14 @@ static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, stru
                     case op_field_arridx_TSC:           dprintf( fd, "%#"PRIx64, (uint64_t)(o->tsc) );          break;
                     case op_field_arridx_MPERF:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->mperf) );        break;
                     case op_field_arridx_APERF:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->aperf) );        break;
-                    case op_field_arridx_THERM:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->therm) );        break;
-                    case op_field_arridx_PTHERM:        dprintf( fd, "%#"PRIx64, (uint64_t)(o->ptherm) );       break;
+                    case op_field_arridx_THERM:         dprintf( fd, "%"PRId8,   get_temperature(o->therm) );   break;
+                    case op_field_arridx_PTHERM:        dprintf( fd, "%"PRId8,   get_temperature(o->ptherm));   break;
                     case op_field_arridx_TAG:           dprintf( fd, "%#"PRIx64, (uint64_t)(o->tag) );          break;
                     case op_field_arridx_DELTA_MPERF:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->mperf   - prev->mperf   ) ); } break;
                     case op_field_arridx_DELTA_APERF:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->aperf   - prev->aperf   ) ); } break;
                     case op_field_arridx_DELTA_TSC:     if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->tsc     - prev->tsc     ) ); } break;
-                    case op_field_arridx_DELTA_THERM:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->therm   - prev->therm   ) ); } break;
-                    case op_field_arridx_DELTA_PTHERM:  if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->ptherm  - prev->ptherm  ) ); } break;
+                    case op_field_arridx_DELTA_THERM:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId8,  get_temperature( o->therm )  - get_temperature( prev->therm )  ); } break;
+                    case op_field_arridx_DELTA_PTHERM:  if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId8,  get_temperature( o->ptherm ) - get_temperature( prev->ptherm ) ); } break;
                     case op_field_arridx_DELTA_MSRDATA: if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->msrdata - prev->msrdata ) ); } break;
                     default:
                         fprintf( stderr, "%s:%d:%s Unknown value for arridx:  %#"PRIx64"\n", __FILE__, __LINE__, __func__, arridx );
