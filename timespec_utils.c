@@ -11,15 +11,18 @@
 
 char* timespec2str( const struct timespec * const t ){
 
-    const uint64_t ns_per_d = (uint64_t)1'000'000'000 * 60 * 60 * 24;
-    const uint64_t ns_per_h = (uint64_t)1'000'000'000 * 60 * 60;
-    const uint64_t ns_per_m = (uint64_t)1'000'000'000 * 60;
-    const uint64_t ns_per_s = (uint64_t)1'000'000'000;
-    const uint64_t ns_per_ms= (uint64_t)1'000'000;
+
     const uint64_t ns_per_us= (uint64_t)1'000;
+    const uint64_t ns_per_ms= ns_per_us * 1'000;
+    const uint64_t ns_per_s = ns_per_ms * 1'000;
+    const uint64_t ns_per_m = ns_per_s * 60;
+    const uint64_t ns_per_h = ns_per_m * 60;
+    const uint64_t ns_per_d = ns_per_h * 24;
+
     const uint64_t ns       = t->tv_sec * ns_per_s + t->tv_nsec;
 
     char *str = calloc( 1024, 1 );
+
 
     // Largest unit is days
     if( ns >= ns_per_d){
@@ -46,7 +49,7 @@ char* timespec2str( const struct timespec * const t ){
                     ns / ns_per_m,
                     (ns % ns_per_m) / ( ns_per_m / 1000 ) );
         }else{
-            sprintf( str, "%"PRIu64"h", ns / ns_per_m );
+            sprintf( str, "%"PRIu64"m", ns / ns_per_m );
         }
     // Largest unit is seconds
     }else if( ns >= ns_per_s){
