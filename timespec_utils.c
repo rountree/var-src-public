@@ -154,12 +154,6 @@ size_t timespec_division( const struct timespec * const restrict numerator, cons
     return n/d;
 }
 
-void dprintf_timespec( int fd, const struct timespec * const restrict t ){
-    char *s = timespec2str( t );
-    dprintf( fd, "%s", s );
-    free(s);
-}
-
 void fprintf_timespec( FILE * const restrict fp, const struct timespec * const restrict t ){
     char *s = timespec2str( t );
     fprintf( fp, "%s", s );

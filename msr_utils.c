@@ -9,6 +9,7 @@
 #include <stdio.h>          // printf(3), perror(3)
 #include <sys/ioctl.h>      // ioctl(2)
 #include <errno.h>          // errno
+#include <sys/time.h>	    // gettimeofday()
 #include "msr_version.h"    // MSR_SAFE_VERSION_u32
 #include "cpuset_utils.h"   // get_next_cpu()
 #include "msr_utils.h"
@@ -383,19 +384,19 @@ void populate_allowlist( void ) {
 }
 
 
-static void print_header( int fd, uint64_t op_bitfield ){
+static void print_header( FILE* fp, uint64_t op_bitfield ){
     static bool is_first = true;
     if( 0 == op_bitfield ){
-        dprintf( fd, "# No column headers requested\n");
+        fprintf( fp, "# No column headers requested\n");
     }else{
-        dprintf( fd, "# bitfield for header selection is:  %#"PRIx64"\n", op_bitfield );
+        fprintf( fp, "# bitfield for header selection is:  %#"PRIx64"\n", op_bitfield );
         for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
             if( op_bitfield & ( 1 << arridx ) ){
-                dprintf( fd, is_first ? "%s" : " %s", opfield2str[ arridx ] );
+                fprintf( fp, is_first ? "%s" : " %s", opfield2str[ arridx ] );
                 is_first = false;
             }
         }
-        dprintf( fd, "\n" );
+        fprintf( fp, "\n" );
     }
     return;
 }
@@ -405,7 +406,7 @@ static int8_t get_temperature( uint64_t val ){
     return (int8_t)( (val >> 17) & 0x3fULL );
 }
 
-static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, struct msr_batch_op *prev, bool skip_unused ){
+static void print_op( FILE *fp, uint64_t op_bitfield, struct msr_batch_op *o, struct msr_batch_op *prev, bool skip_unused ){
 
     if( ( o->err == UNUSED_OP ) && skip_unused ){
         return;
@@ -414,7 +415,7 @@ static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, stru
     static bool is_first = true;    // Add a leading space to all but the first field
 
     if( 0 == op_bitfield ){
-        dprintf( fd, "# No column headers requested\n");
+        fprintf( fp, "# No column headers requested\n");
     }else{
         for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
             if( op_bitfield & ( 1 << arridx ) ){
@@ -422,32 +423,32 @@ static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, stru
                 if( is_first ){
                     is_first = false;
                 }else{
-                    dprintf( fd, " " );
+                    fprintf( fp, " " );
                 }
                 // print out the formatted value
                 // casting required because the kernel's _u64 is not quite the same time as uint64_t
                 // (unsigned long vs unsigned long long, I think, though I forget which was which)
                 switch( arridx ){
-                    case op_field_arridx_CPU:           dprintf( fd, "%#"PRIx16, (uint16_t)(o->cpu) );          break;
-                    case op_field_arridx_OP:            dprintf( fd, "%#"PRIx16, (uint16_t)(o->op) );           break;
-                    case op_field_arridx_ERR:           dprintf( fd, "%#"PRIx32, ( int32_t)(o->err) );          break;
-                    case op_field_arridx_POLL_MAX:      dprintf( fd, "%#"PRIx32, (uint32_t)(o->poll_max) );     break;
-                    case op_field_arridx_WMASK:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->wmask) );        break;
-                    case op_field_arridx_MSR:           dprintf( fd, "%#"PRIx32, (uint32_t)(o->msr) );          break;
-                    case op_field_arridx_MSRDATA:       dprintf( fd, "%#"PRIx64, (uint64_t)(o->msrdata) );      break;
-                    case op_field_arridx_MSRDATA2:      dprintf( fd, "%#"PRIx64, (uint64_t)(o->msrdata2) );     break;
-                    case op_field_arridx_TSC:           dprintf( fd, "%#"PRIx64, (uint64_t)(o->tsc) );          break;
-                    case op_field_arridx_MPERF:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->mperf) );        break;
-                    case op_field_arridx_APERF:         dprintf( fd, "%#"PRIx64, (uint64_t)(o->aperf) );        break;
-                    case op_field_arridx_THERM:         dprintf( fd, "%"PRId8,   get_temperature(o->therm) );   break;
-                    case op_field_arridx_PTHERM:        dprintf( fd, "%"PRId8,   get_temperature(o->ptherm));   break;
-                    case op_field_arridx_TAG:           dprintf( fd, "%#"PRIx64, (uint64_t)(o->tag) );          break;
-                    case op_field_arridx_DELTA_MPERF:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->mperf   - prev->mperf   ) ); } break;
-                    case op_field_arridx_DELTA_APERF:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->aperf   - prev->aperf   ) ); } break;
-                    case op_field_arridx_DELTA_TSC:     if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->tsc     - prev->tsc     ) ); } break;
-                    case op_field_arridx_DELTA_THERM:   if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId8,  get_temperature( o->therm )  - get_temperature( prev->therm )  ); } break;
-                    case op_field_arridx_DELTA_PTHERM:  if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId8,  get_temperature( o->ptherm ) - get_temperature( prev->ptherm ) ); } break;
-                    case op_field_arridx_DELTA_MSRDATA: if( prev && ( prev->err != UNUSED_OP ) ){ dprintf( fd, "%"PRId64, (int64_t)( o->msrdata - prev->msrdata ) ); } break;
+                    case op_field_arridx_CPU:           fprintf( fp, "%#"PRIx16, (uint16_t)(o->cpu) );          break;
+                    case op_field_arridx_OP:            fprintf( fp, "%#"PRIx16, (uint16_t)(o->op) );           break;
+                    case op_field_arridx_ERR:           fprintf( fp, "%#"PRIx32, ( int32_t)(o->err) );          break;
+                    case op_field_arridx_POLL_MAX:      fprintf( fp, "%#"PRIx32, (uint32_t)(o->poll_max) );     break;
+                    case op_field_arridx_WMASK:         fprintf( fp, "%#"PRIx64, (uint64_t)(o->wmask) );        break;
+                    case op_field_arridx_MSR:           fprintf( fp, "%#"PRIx32, (uint32_t)(o->msr) );          break;
+                    case op_field_arridx_MSRDATA:       fprintf( fp, "%#"PRIx64, (uint64_t)(o->msrdata) );      break;
+                    case op_field_arridx_MSRDATA2:      fprintf( fp, "%#"PRIx64, (uint64_t)(o->msrdata2) );     break;
+                    case op_field_arridx_TSC:           fprintf( fp, "%#"PRIx64, (uint64_t)(o->tsc) );          break;
+                    case op_field_arridx_MPERF:         fprintf( fp, "%#"PRIx64, (uint64_t)(o->mperf) );        break;
+                    case op_field_arridx_APERF:         fprintf( fp, "%#"PRIx64, (uint64_t)(o->aperf) );        break;
+                    case op_field_arridx_THERM:         fprintf( fp, "%"PRId8,   get_temperature(o->therm) );   break;
+                    case op_field_arridx_PTHERM:        fprintf( fp, "%"PRId8,   get_temperature(o->ptherm));   break;
+                    case op_field_arridx_TAG:           fprintf( fp, "%#"PRIx64, (uint64_t)(o->tag) );          break;
+                    case op_field_arridx_DELTA_MPERF:   if( prev && ( prev->err != UNUSED_OP ) ){ fprintf( fp, "%"PRId64, (int64_t)( o->mperf   - prev->mperf   ) ); } break;
+                    case op_field_arridx_DELTA_APERF:   if( prev && ( prev->err != UNUSED_OP ) ){ fprintf( fp, "%"PRId64, (int64_t)( o->aperf   - prev->aperf   ) ); } break;
+                    case op_field_arridx_DELTA_TSC:     if( prev && ( prev->err != UNUSED_OP ) ){ fprintf( fp, "%"PRId64, (int64_t)( o->tsc     - prev->tsc     ) ); } break;
+                    case op_field_arridx_DELTA_THERM:   if( prev && ( prev->err != UNUSED_OP ) ){ fprintf( fp, "%"PRId8,  get_temperature( o->therm )  - get_temperature( prev->therm )  ); } break;
+                    case op_field_arridx_DELTA_PTHERM:  if( prev && ( prev->err != UNUSED_OP ) ){ fprintf( fp, "%"PRId8,  get_temperature( o->ptherm ) - get_temperature( prev->ptherm ) ); } break;
+                    case op_field_arridx_DELTA_MSRDATA: if( prev && ( prev->err != UNUSED_OP ) ){ fprintf( fp, "%"PRId64, (int64_t)( o->msrdata - prev->msrdata ) ); } break;
                     default:
                         fprintf( stderr, "%s:%d:%s Unknown value for arridx:  %#"PRIx64"\n", __FILE__, __LINE__, __func__, arridx );
                         assert(0);
@@ -455,7 +456,7 @@ static void print_op( int fd, uint64_t op_bitfield, struct msr_batch_op *o, stru
                 }
             }
         }
-        dprintf( fd, "\n" );
+        fprintf( fp, "\n" );
     }
     return;
 
@@ -562,17 +563,17 @@ static void cleanup_poll_data( struct job *job ){
 static void print_execution_counts( struct job *job ){
     static char filename[2048];
     snprintf( filename, 2047, "./benchmarks.out" );
-    int fd = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
-    assert( fd >= 0 );
-    dprintf(fd, "benchmark_type cpu A B\n");
+    FILE *fp = fopen( filename, "w" );
+    assert( fp != NULL );
+    fprintf(fp, "benchmark_type cpu A B\n");
     for( size_t i = 0; i < job->benchmark_count; i++ ){
-        dprintf( fd, "%s %u %15"PRIu64" %15"PRIu64"\n",
+        fprintf( fp, "%s %u %15"PRIu64" %15"PRIu64"\n",
             benchmarktype2str[ job->benchmarks[ i ]->benchmark_type ],
             get_next_cpu( 0, 255, &(job->benchmarks[ i ]->execution_cpu ) ),
             job->benchmarks[ i ]->executed_loops[0],
             job->benchmarks[ i ]->executed_loops[1] );
     }
-    close(fd);
+    fclose(fp);
 }
 
 
@@ -595,8 +596,8 @@ void dump_batches( struct job *job ){
                         i,
                         longitudinaltype2str[ job->longitudinals[i]->longitudinal_type ],
                         longitudinalslot2str[ slot_idx ] );
-                int fd = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
-                if( fd < 0 ){
+                FILE *fp = fopen( filename, "w" );
+                if( fp == NULL ){
                     perror("");
                     fprintf( stderr, "%s:%d:%s Error opening file %s.  Bye!\n", __FILE__, __LINE__, __func__, filename );
                     exit(-1);
@@ -605,17 +606,17 @@ void dump_batches( struct job *job ){
                 if( slot_idx == READ ){
                     switch( job->longitudinals[i]->longitudinal_type ){
                         case FIXED_FUNCTION_COUNTERS:
-                            dprintf( fd, "# 0x0309 FIXED_CTR0 (INST_RETIRED.ANY)\n");
-                            dprintf( fd, "# 0x030a FIXED_CTR1 (CPU_CLK_UNHALTED)\n");
-                            dprintf( fd, "# 0x030b FIXED_CTR2 (CPU_CLK_UNHALTED.REF_TSC)\n");
+                            fprintf( fp, "# 0x0309 FIXED_CTR0 (INST_RETIRED.ANY)\n");
+                            fprintf( fp, "# 0x030a FIXED_CTR1 (CPU_CLK_UNHALTED)\n");
+                            fprintf( fp, "# 0x030b FIXED_CTR2 (CPU_CLK_UNHALTED.REF_TSC)\n");
                             break;
                         case ENERGY_COUNTERS:
-                            dprintf( fd, "# 0x0606 RAPL_POWER_UNIT\n" );
-                            dprintf( fd, "# 0x0611 PKG_ENERGY_STATUS\n" );
-                            dprintf( fd, "# 0x0619 DRAM_ENERGY_STATUS\n" );
-                            dprintf( fd, "# 0x0639 PP0_ENERGY_STATUS\n" );
-                            dprintf( fd, "# 0x0641 PP1_ENERGY_STATUS\n" );
-                            dprintf( fd, "# 0x064d PLATFORM_ENERGY_COUNTER\n" );
+                            fprintf( fp, "# 0x0606 RAPL_POWER_UNIT\n" );
+                            fprintf( fp, "# 0x0611 PKG_ENERGY_STATUS\n" );
+                            fprintf( fp, "# 0x0619 DRAM_ENERGY_STATUS\n" );
+                            fprintf( fp, "# 0x0639 PP0_ENERGY_STATUS\n" );
+                            fprintf( fp, "# 0x0641 PP1_ENERGY_STATUS\n" );
+                            fprintf( fp, "# 0x064d PLATFORM_ENERGY_COUNTER\n" );
                             break;
                         default:
                             assert(0);
@@ -623,12 +624,12 @@ void dump_batches( struct job *job ){
                     }
                 }
 
-                print_header( fd,op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC);
+                print_header( fp,op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC);
                 for( size_t op_idx = 0; op_idx < job->longitudinals[i]->batches[slot_idx]->numops; op_idx++ ){
-                    print_op( fd, op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC,
+                    print_op( fp, op_field_bitidx_CPU | op_field_bitidx_ERR | op_field_bitidx_MSR | op_field_bitidx_MSRDATA | op_field_bitidx_TSC,
                             &( job->longitudinals[i]->batches[slot_idx]->ops[op_idx] ), NULL, true);
                 }
-                close( fd );
+                fclose( fp );
             }
         }
     }
@@ -644,27 +645,27 @@ void dump_batches( struct job *job ){
 
             static char filename[2048];
             snprintf( filename, 2047, "./poll_%zu.raw", i );
-            int fd = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
-            assert( -1 != fd );
-            dprintf( fd, "cpu op err poll_max msr wmask msrdata msrdata2 tsc mperf aperf therm ptherm tag\n" );
+            FILE *fp = fopen( filename, "w" );
+            assert( NULL != fp );
+            fprintf( fp, "cpu op err poll_max msr wmask msrdata msrdata2 tsc mperf aperf therm ptherm tag\n" );
             for( size_t o = 0; o < job->polls[i]->total_ops; o++ ){
-                dprintf( fd, "%"PRIu16" ",  (uint16_t) job->polls[i]->poll_ops[o].cpu );
-                dprintf( fd, "%"PRIu16" ",  (uint16_t) job->polls[i]->poll_ops[o].op  );
-                dprintf( fd, "%"PRId32" ",  ( int32_t) job->polls[i]->poll_ops[o].err );
-                dprintf( fd, "%"PRIu32" ",  (uint32_t) job->polls[i]->poll_ops[o].poll_max );
-                dprintf( fd, "%#"PRIx32" ", (uint32_t) job->polls[i]->poll_ops[o].msr );
-                dprintf( fd, "%#"PRIx64" ", (uint64_t) job->polls[i]->poll_ops[o].wmask );
-                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].msrdata );
-                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].msrdata2 );
-                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].tsc );
-                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].mperf );
-                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].aperf );
-                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].therm );
-                dprintf( fd, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].ptherm );
-                dprintf( fd, "%"PRIu64   ,  (uint64_t) job->polls[i]->poll_ops[o].tag );
-                dprintf( fd, "\n" );
+                fprintf( fp, "%"PRIu16" ",  (uint16_t) job->polls[i]->poll_ops[o].cpu );
+                fprintf( fp, "%"PRIu16" ",  (uint16_t) job->polls[i]->poll_ops[o].op  );
+                fprintf( fp, "%"PRId32" ",  ( int32_t) job->polls[i]->poll_ops[o].err );
+                fprintf( fp, "%"PRIu32" ",  (uint32_t) job->polls[i]->poll_ops[o].poll_max );
+                fprintf( fp, "%#"PRIx32" ", (uint32_t) job->polls[i]->poll_ops[o].msr );
+                fprintf( fp, "%#"PRIx64" ", (uint64_t) job->polls[i]->poll_ops[o].wmask );
+                fprintf( fp, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].msrdata );
+                fprintf( fp, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].msrdata2 );
+                fprintf( fp, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].tsc );
+                fprintf( fp, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].mperf );
+                fprintf( fp, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].aperf );
+                fprintf( fp, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].therm );
+                fprintf( fp, "%"PRIu64" ",  (uint64_t) job->polls[i]->poll_ops[o].ptherm );
+                fprintf( fp, "%"PRIu64   ,  (uint64_t) job->polls[i]->poll_ops[o].tag );
+                fprintf( fp, "\n" );
             }
-            close(fd);
+            fclose(fp);
         }
 
         // Nicer dump
@@ -672,7 +673,7 @@ void dump_batches( struct job *job ){
         for( size_t i = 0; i < job->poll_count; i++ ){
 
             static char filename[2048];
-            int fd[ op_field_arridx_MAX_IDX ];
+            FILE *fp[ op_field_arridx_MAX_IDX ];
 
             // ...for each array index...
             for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
@@ -681,15 +682,15 @@ void dump_batches( struct job *job ){
                 snprintf( filename, 2047, "./poll_%zu_%s_%#"PRIx32".out", i, opfield2str[ arridx ], job->polls[i]->msr );
 
                 // ...create that file...
-                fd[ arridx ] = open( filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR );
-                if( fd[ arridx ] < 0 ){
+                fp[ arridx ] = fopen( filename, "w" );
+                if( fp[ arridx ] == NULL ){
                     perror("");
                     fprintf( stderr, "%s:%d:%s Error opening file %s.  Bye!\n", __FILE__, __LINE__, __func__, filename );
                     exit(-1);
                 }
 
                 // ...and print a header to it.
-                print_header( fd[ arridx ], 1ULL << arridx );
+                print_header( fp[ arridx ], 1ULL << arridx );
             }
 
             // Probably faster to visit each operation once.
@@ -701,12 +702,12 @@ void dump_batches( struct job *job ){
                 // ...for each field...
                 for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
                     // ...print the data in that field.
-                    print_op( fd[ arridx ], 1ULL << arridx, &(job->polls[i]->poll_ops[o]), &(job->polls[i]->poll_ops[ o-1 ]), true );
+                    print_op( fp[ arridx ], 1ULL << arridx, &(job->polls[i]->poll_ops[o]), &(job->polls[i]->poll_ops[ o-1 ]), true );
                 }
             }
             // Close a bunch of files.
             for( op_field_arridx_t arridx = 0; arridx < op_field_arridx_MAX_IDX; arridx++ ){
-                close( fd[ arridx ] );
+                fclose( fp[ arridx ] );
             }
         }
     }
@@ -786,12 +787,6 @@ char* flags2str( op_flag_t flags ){
         }
     }
     return str;
-}
-
-void dprintf_flags( int fd, op_flag_t flags ){
-    char *str = flags2str( flags );
-    dprintf( fd, "%s", str );
-    free(str);
 }
 
 void fprintf_flags( FILE *fp, op_flag_t flags ){

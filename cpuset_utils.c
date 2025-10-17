@@ -137,13 +137,6 @@ char * cpuset2str( cpu_set_t *cpus ){
     return str;
 }
 
-
-void dprintf_cpuset( int fd, cpu_set_t *cpus ){
-    char * str = cpuset2str( cpus );
-    dprintf( fd, "%s", str );
-    free( str );
-}
-
 void fprintf_cpuset( FILE *fp, cpu_set_t *cpus ){
     char * str = cpuset2str( cpus );
     fprintf( fp, "%s", str );
