@@ -121,7 +121,6 @@ char * cpuset2str( cpu_set_t *cpus ){
 
             // Use range notation for 3 or more consecutive "set" cpus.
             if( hi_cpu - lo_cpu > 2 ){
-                printf( "-%d", hi_cpu );
                 count -= (hi_cpu - lo_cpu) + 1;
                 lo_cpu = hi_cpu+2; // We know hi_cpu+1 is unset
             }else{

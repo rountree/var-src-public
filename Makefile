@@ -8,20 +8,24 @@
 # gcc 14+
 # 	Required for -std=c23.
 
+# rzhound
+CFLAGS=-iquote /usr/workspace/msr-adm/rzhound_dat/msr-safe -std=c2x
+CC=gcc
+
 # Serif
-CFLAGS=-iquote ${HOME}/repos/msr-safe
-CC=gcc-14
+#CFLAGS=-iquote ${HOME}/repos/msr-safe -std=c23
+#CC=gcc-14
 
 # Poodle
-#CFLAGS=-iquote /p/vast1/rountree/poodle/repos/msr-safe
+#CFLAGS=-iquote /p/vast1/rountree/poodle/repos/msr-safe -std=c23
 #CC=/p/vast1/rountree/poodle/install/gcc-trunk-27Oct2024/bin/gcc
 
 # Gilia
-#CFLAGS=-iquote ${HOME}/gilia/repos/msr-safe
+#CFLAGS=-iquote ${HOME}/gilia/repos/msr-safe -std=c23
 #CC=${HOME}/gilia/install/gcc-trunk-11Nov2024/bin/gcc
 
 # Common
-CFLAGS+=-Wall -Wextra -march=native -mxsave -std=c23 -fdiagnostics-color=always
+CFLAGS+=-Wall -Wextra -march=native -mxsave -fdiagnostics-color=always
 CFLAGS+=-Werror
 LDFLAGS=-lpthread
 
