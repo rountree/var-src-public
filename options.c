@@ -180,7 +180,7 @@ void parse_options( int argc, char **argv, struct job *job ){
         { .name = "time",         .has_arg = required_argument, .flag = NULL, .val = 't' },
         { .name = "version",      .has_arg = no_argument,       .flag = NULL, .val = 'v' },
         { .name = "abTime",       .has_arg = required_argument, .flag = NULL, .val = 'T' },
-        { .name = "abRandomize",  .has_arg = no_argument,       .flag = NULL, .val = 'R' },
+        { .name = "abRandomized", .has_arg = no_argument,       .flag = NULL, .val = 'R' },
         { 0, 0, 0, 0}
     };
 
