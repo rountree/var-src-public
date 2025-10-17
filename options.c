@@ -428,6 +428,10 @@ void parse_options( int argc, char **argv, struct job *job ){
                 pll->msr = (uint32_t)safe_strtoull( pll_msr_str );
                 pll->flags = str2flags( pll_flags_str );
                 str2timespec( pll_timespec_str, &pll->interval );
+		if( pll->interval.tv_sec == 0 && pll->interval.tv_nsec == 0 ){
+			fprintf( stderr, "Polling interval cannot be 0.\n" );
+			exit(-1);
+		}
                 str2cpuset( pll_polled_cpuset_str, &pll->polled_cpu );
                 str2cpuset( pll_control_cpuset_str, &pll->control_cpu );
                 free(local_optarg);
