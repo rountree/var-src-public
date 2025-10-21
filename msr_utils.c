@@ -1,4 +1,4 @@
-#define _GNU_SOURCE         // for sched.h
+#define _GNU_SOURCE         // for sched.h, reallocarray(3)
 #include <stdlib.h>         // calloc(3)
 #include <string.h>         // memcpy(3)
 #include <assert.h>         // assert(3)
@@ -381,6 +381,38 @@ void populate_allowlist( void ) {
         exit(-1);
     }
     close(fd);
+
+    // Now test the allowlist.
+    struct msr_batch_array batch;	
+    batch.numops = 0;
+    batch.version = MSR_SAFE_VERSION_u32;
+    batch.ops = NULL;
+    __u32 addr;
+    __u64 mask; // Ignore after parsing.
+    char const *al = allowlist;
+    while( 2 == sscanf( al, "0x%x 0x%llx\n", &addr, &mask ) ){
+        al += 26; // FIXME less than robust
+	printf( "addr=0x%x, mask=0x%llx\n", addr, mask );
+	batch.numops++;
+	batch.ops = reallocarray( batch.ops, batch.numops, sizeof( struct msr_batch_op ) );
+	assert( batch.ops );
+	batch.ops[ batch.numops - 1].cpu = 0;	// FIXME should be allowed to specify a cpuset on the command line
+	batch.ops[ batch.numops - 1].op  = OP_READ;
+	batch.ops[ batch.numops - 1].err = 0;
+	batch.ops[ batch.numops - 1].msr = addr;
+	batch.ops[ batch.numops - 1].msrdata = 0;
+    }
+    fd = open( "/dev/cpu/msr_batch", O_RDONLY );
+    assert( fd > 0 );
+    ioctl( fd, X86_IOC_MSR_BATCH, &batch );
+    for( size_t i = 0; i < batch.numops; i++ ){
+        fprintf( stdout, "0x%x %d 0x%llx\n", 
+            batch.ops[ i ].msr,
+            batch.ops[ i ].err,
+            batch.ops[ i ].msrdata);
+    }
+    close(fd);
+
 }
 
 
