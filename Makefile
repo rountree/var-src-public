@@ -9,8 +9,12 @@
 # 	Required for -std=c23.
 
 # rzhound
-CFLAGS=-iquote /usr/workspace/msr-adm/rzhound_dat/msr-safe -std=c2x
-CC=gcc
+#CFLAGS=-iquote /usr/workspace/msr-adm/rzhound_dat/msr-safe -std=c2x
+#CC=gcc
+
+# Iris
+CFLAGS=-iquote /dev/shm/msr-safe -std=c23
+CC=${HOME}/install/gcc-15.2.0/bin/gcc
 
 # Serif
 #CFLAGS=-iquote ${HOME}/repos/msr-safe -std=c23
