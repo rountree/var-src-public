@@ -545,17 +545,17 @@ static void print_summaries( struct job *job ){
     }
 }
 #endif
-#if 0
-static void cleanup_poll_data( struct job *job ){
+
+static void manage_energy_rollover( struct job *job ){
 
     uint64_t cumulative_adjustment = 0;
     constexpr const uint64_t rollover_adjustment = 1ULL << 32;
 
     for( size_t i = 0; i < job->poll_count; i++ ){
-        if( job->polls[i]->poll_type == PKG_ENERGY
-         || job->polls[i]->poll_type == PP0_ENERGY
-         || job->polls[i]->poll_type == PP1_ENERGY
-         || job->polls[i]->poll_type == DRAM_ENERGY
+        if( job->polls[i]->msr == PKG_ENERGY_STATUS
+         || job->polls[i]->msr == PP0_ENERGY_STATUS
+         || job->polls[i]->msr == PP1_ENERGY_STATUS
+         || job->polls[i]->msr == DRAM_ENERGY_STATUS
         ){
             for( size_t b = 0; b < job->polls[i]->total_ops; b++ ){
 
@@ -578,20 +578,8 @@ static void cleanup_poll_data( struct job *job ){
             }
         }
     }
-
-    for( size_t i = 0; i < job->poll_count; i++ ){
-        for( size_t b = 0; b < job->polls[i]->total_ops; b++ ){
-            if( job->polls[i]->poll_ops[b].op & OP_THERM ){
-                job->polls[i]->poll_ops[b].therm = (job->polls[i]->poll_ops[b].therm >> 16) & 0x7f;
-            }
-            if( job->polls[i]->poll_ops[b].op & OP_PTHERM ){
-                job->polls[i]->poll_ops[b].ptherm = (job->polls[i]->poll_ops[b].ptherm >> 16) & 0x7f;
-            }
-            job->polls[i]->poll_ops[b].wmask =  job->polls[i]->poll_ops[b].op >> 12;
-        }
-    }
 }
-#endif 
+
 static void print_execution_counts( struct job *job ){
     static char filename[2048];
     snprintf( filename, 2047, "./benchmarks.out" );
@@ -669,7 +657,7 @@ void dump_batches( struct job *job ){
     if( job->poll_count ){
 
         // polls
-        //cleanup_poll_data( job ); FIXME
+        manage_energy_rollover( job );
         //print_summaries( job );   FIXME
 
         // Raw dump
