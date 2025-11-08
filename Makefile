@@ -1,32 +1,29 @@
 # Required versions
 #
-# glibc 3.34+
-# 	Used for debugging with _FORTIFY_SOURCE=3
-#	Execute the library to get version information, e.g,
-#		/lib/x86_64-linux-gnu/libc.so.6
-#
 # gcc 14+
 # 	Required for -std=c23.
 
-# rzhound
-#CFLAGS=-iquote /usr/workspace/msr-adm/rzhound_dat/msr-safe -std=c2x
-#CC=gcc
-
-# Iris
-CFLAGS=-iquote /dev/shm/msr-safe -std=c23
-CC=${HOME}/install/gcc-15.2.0/bin/gcc
-
-# Serif
-#CFLAGS=-iquote ${HOME}/repos/msr-safe -std=c23
-#CC=gcc-14
-
-# Poodle
-#CFLAGS=-iquote /p/vast1/rountree/poodle/repos/msr-safe -std=c23
-#CC=/p/vast1/rountree/poodle/install/gcc-trunk-27Oct2024/bin/gcc
-
-# Gilia
-#CFLAGS=-iquote ${HOME}/gilia/repos/msr-safe -std=c23
-#CC=${HOME}/gilia/install/gcc-trunk-11Nov2024/bin/gcc
+# Power lab machines
+ifneq ($(filter $(shell hostname | sed -e "s/[0-9]//"), comus octomore rhetoric iris lupine gilia sorrel curry thompson),)
+	CFLAGS=-iquote /dev/shm/msr-safe -std=c23
+	CC=${HOME}/install/gcc-15.2.0/bin/gcc
+# rz machines
+else ifneq ($(filter $(shell hostname | sed -e "s/[0-9]//"), rzhound rzwhippet),)
+	CFLAGS=-iquote /usr/workspace/msr-adm/rzhound_dat/msr-safe -std=c2x
+	CC=gcc
+# cz machines
+else ifneq ($(filter $(shell hostname | sed -e "s/[0-9]//"), dane poodle),)
+	CFLAGS=-iquote /p/vast1/rountree/poodle/repos/msr-safe -std=c23
+	CC=/p/vast1/rountree/poodle/install/gcc-trunk-27Oct2024/bin/gcc
+# offsite machines
+else ifneq ($(filter $(shell hostname | sed -e "s/[0-9]//"), serif catharsis),)
+	CFLAGS=-iquote ${HOME}/repos/msr-safe -std=c23
+	CC=gcc
+# generic option
+else
+	CFLAGS=-iquote ${HOME}/repos/msr-safe -std=c23
+	CC=gcc
+endif
 
 # Common
 CFLAGS+=-Wall -Wextra -march=native -mxsave -fdiagnostics-color=always
