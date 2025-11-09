@@ -48,7 +48,7 @@ struct benchmark_config{
     pthread_t                   benchmark_thread;
     pthread_mutex_t             benchmark_mutex;
     volatile bool               *halt;
-    volatile bool               *ab_selector;
+    volatile bool               *ab_selector;   // See notes in struct job.
 };
 
 struct longitudinal_config{
@@ -73,7 +73,14 @@ struct job{
 
     // Internal
     volatile bool               halt;               // The big red off button.
-    volatile bool               ab_selector;
+    volatile bool               ab_selector;        // Select whether we're running workload A or B
+                                                    //   WRITTEN TO by the main thread.
+                                                    //   READ BY the benchmark thread and the polling thread.
+    volatile bool               valid;              // Set invalid during A->B or B->A transition, as the
+                                                    //   polling sample will straddle portions of both.
+                                                    //   WRITTEN TO by the main thread and the polling thread.
+                                                    //   READ BY the polling thread
+
 
     // Polls
     struct poll_config          **polls;

@@ -74,9 +74,9 @@ void* poll_thread_start( void *v ){
     assert( 0 == pthread_mutex_lock( &(job.polls[i]->poll_mutex) ) );
     for( size_t b = 0; b < job.polls[i]->total_ops && !(job.halt); b++ ){
         errno = 0;
-        job.polls[i]->poll_ops[b].tag |= job.ab_selector << 1;
         int rc = ioctl( fd, X86_IOC_MSR_BATCH, &(job.polls[i]->poll_batches[b]) );
-        job.polls[i]->poll_ops[b].tag |= job.ab_selector << 0;
+        job.polls[i]->poll_ops[b].tag = ( job.ab_selector << 1 ) | ( job.valid );
+        job.valid = true;   // Set to false by the main thread, below, after A->B or B->A transition.
         if( -1 == rc ){
             fprintf( stderr, "%s:%d:%s ioctl in poll thread %zu batch %zu returned %d, errno=%d.\n",
                     __FILE__, __LINE__, __func__, i, b, rc, errno );
@@ -152,12 +152,18 @@ int main( int argc, char **argv ){
     struct timespec elapsed;
     elapsed.tv_sec  = 0;
     elapsed.tv_nsec = 0;;
-    uint64_t iterations[2] = {0,0};
+    uint64_t iterations[64] = {0,0};
     do{
         if( job.ab_randomized ){
-            job.ab_selector = random() & 0x1;
+            bool next = random() & 0x1;
+            // Don't invalidate the current poll if we're still doing the same benchmark workload.
+            if( job.ab_selector != next ){
+                job.ab_selector = next;
+                job.valid = false;
+            }
         }else{
             job.ab_selector = ! job.ab_selector;
+            job.valid = false;
         }
 
         nanosleep( &(job.ab_duration), NULL );
