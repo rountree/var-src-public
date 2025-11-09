@@ -30,7 +30,7 @@ typedef enum : uint64_t{
     MISC_PACKAGE_CTLS                = 0x00BC,
     MPERF                            = 0x00E7,
     APERF                            = 0x00E8,
-    ARCH_CAPABILTIES                 = 0x010A,
+    ARCH_CAPABILITIES                = 0x010A,
     PERF_STATUS                      = 0x0198,
     PERF_CTL                         = 0x0199,
     THERM_STATUS                     = 0x019C, // 22:16 Degrees C away from max
@@ -48,7 +48,7 @@ typedef enum : uint64_t{
     PACKAGE_ENERGY_TIME_STATUS       = 0x0612,
     PKG_PERF_STATUS                  = 0x0613,
     PKG_POWER_INFO                   = 0x0614,
-    DRAM_PWER_LIMIT                  = 0x0618,
+    DRAM_POWER_LIMIT                 = 0x0618,
     DRAM_ENERGY_STATUS               = 0x0619,
     DRAM_PERF_STATUS                 = 0x061B,
     DRAM_POWER_INFO                  = 0x061C,
@@ -178,12 +178,53 @@ static constexpr const struct msr_batch_op op_start_global = { .op = OP_WRITE | 
 static constexpr const struct msr_batch_op op_stop_global  = { .op = OP_WRITE | OP_TSC, .msr = PERF_GLOBAL_CTRL, .msrdata=0x000000000 };
 
 // Single-read energy instructions.
+/*
 static constexpr const struct msr_batch_op op_rd_RAPL_POWER_UNIT         = { .op = OP_READ | OP_ALL_MODS, .msr = RAPL_POWER_UNIT };
 static constexpr const struct msr_batch_op op_rd_PKG_ENERGY_STATUS       = { .op = OP_READ | OP_ALL_MODS, .msr = PKG_ENERGY_STATUS };
 static constexpr const struct msr_batch_op op_rd_DRAM_ENERGY_STATUS      = { .op = OP_READ | OP_ALL_MODS, .msr = DRAM_ENERGY_STATUS };
 static constexpr const struct msr_batch_op op_rd_PP0_ENERGY_STATUS       = { .op = OP_READ | OP_ALL_MODS, .msr = PP0_ENERGY_STATUS };
 static constexpr const struct msr_batch_op op_rd_PP1_ENERGY_STATUS       = { .op = OP_READ | OP_ALL_MODS, .msr = PP1_ENERGY_STATUS };
 static constexpr const struct msr_batch_op op_rd_PLATFORM_ENERGY_COUNTER = { .op = OP_READ | OP_ALL_MODS, .msr = PLATFORM_ENERGY_COUNTER };
+*/
+
+// All readable MSRs with OP_ALL_MODS
+static constexpr const struct msr_batch_op op_rd_TIME_STAMP_COUNTER                 = { .op = OP_READ | OP_ALL_MODS, .msr = TIME_STAMP_COUNTER };
+static constexpr const struct msr_batch_op op_rd_MISC_PACKAGE_CTLS                  = { .op = OP_READ | OP_ALL_MODS, .msr = MISC_PACKAGE_CTLS };
+static constexpr const struct msr_batch_op op_rd_MPERF                              = { .op = OP_READ | OP_ALL_MODS, .msr = MPERF };
+static constexpr const struct msr_batch_op op_rd_APERF                              = { .op = OP_READ | OP_ALL_MODS, .msr = APERF };
+static constexpr const struct msr_batch_op op_rd_ARCH_CAPABILITIES                  = { .op = OP_READ | OP_ALL_MODS, .msr = ARCH_CAPABILITIES };
+static constexpr const struct msr_batch_op op_rd_PERF_STATUS                        = { .op = OP_READ | OP_ALL_MODS, .msr = PERF_STATUS };
+static constexpr const struct msr_batch_op op_rd_THERM_STATUS                       = { .op = OP_READ | OP_ALL_MODS, .msr = THERM_STATUS };
+static constexpr const struct msr_batch_op op_rd_ENERGY_PERF_BIAS                   = { .op = OP_READ | OP_ALL_MODS, .msr = ENERGY_PERF_BIAS };
+static constexpr const struct msr_batch_op op_rd_PACKAGE_THERM_STATUS               = { .op = OP_READ | OP_ALL_MODS, .msr = PACKAGE_THERM_STATUS };
+static constexpr const struct msr_batch_op op_rd_FIXED_CTR0                         = { .op = OP_READ | OP_ALL_MODS, .msr = FIXED_CTR0 };
+static constexpr const struct msr_batch_op op_rd_FIXED_CTR1                         = { .op = OP_READ | OP_ALL_MODS, .msr = FIXED_CTR1 };
+static constexpr const struct msr_batch_op op_rd_FIXED_CTR2                         = { .op = OP_READ | OP_ALL_MODS, .msr = FIXED_CTR2 };
+static constexpr const struct msr_batch_op op_rd_FIXED_CTR3                         = { .op = OP_READ | OP_ALL_MODS, .msr = FIXED_CTR3 };
+static constexpr const struct msr_batch_op op_rd_FIXED_CTR_CTRL                     = { .op = OP_READ | OP_ALL_MODS, .msr = FIXED_CTR_CTRL };
+static constexpr const struct msr_batch_op op_rd_PERF_GLOBAL_CTRL                   = { .op = OP_READ | OP_ALL_MODS, .msr = PERF_GLOBAL_CTRL };
+static constexpr const struct msr_batch_op op_rd_RAPL_POWER_UNIT                    = { .op = OP_READ | OP_ALL_MODS, .msr = RAPL_POWER_UNIT };
+static constexpr const struct msr_batch_op op_rd_PKG_POWER_LIMIT                    = { .op = OP_READ | OP_ALL_MODS, .msr = PKG_POWER_LIMIT };
+static constexpr const struct msr_batch_op op_rd_PKG_ENERGY_STATUS                  = { .op = OP_READ | OP_ALL_MODS, .msr = PKG_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_PACKAGE_ENERGY_TIME_STATUS         = { .op = OP_READ | OP_ALL_MODS, .msr = PACKAGE_ENERGY_TIME_STATUS };
+static constexpr const struct msr_batch_op op_rd_PKG_PERF_STATUS                    = { .op = OP_READ | OP_ALL_MODS, .msr = PKG_PERF_STATUS };
+static constexpr const struct msr_batch_op op_rd_PKG_POWER_INFO                     = { .op = OP_READ | OP_ALL_MODS, .msr = PKG_POWER_INFO };
+static constexpr const struct msr_batch_op op_rd_DRAM_POWER_LIMIT                   = { .op = OP_READ | OP_ALL_MODS, .msr = DRAM_POWER_LIMIT };
+static constexpr const struct msr_batch_op op_rd_DRAM_ENERGY_STATUS                 = { .op = OP_READ | OP_ALL_MODS, .msr = DRAM_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_DRAM_PERF_STATUS                   = { .op = OP_READ | OP_ALL_MODS, .msr = DRAM_PERF_STATUS };
+static constexpr const struct msr_batch_op op_rd_DRAM_POWER_INFO                    = { .op = OP_READ | OP_ALL_MODS, .msr = DRAM_POWER_INFO };
+static constexpr const struct msr_batch_op op_rd_PP0_POWER_LIMIT                    = { .op = OP_READ | OP_ALL_MODS, .msr = PP0_POWER_LIMIT };
+static constexpr const struct msr_batch_op op_rd_PP0_ENERGY_STATUS                  = { .op = OP_READ | OP_ALL_MODS, .msr = PP0_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_PP0_POLICY                         = { .op = OP_READ | OP_ALL_MODS, .msr = PP0_POLICY };
+static constexpr const struct msr_batch_op op_rd_PP1_POWER_LIMIT                    = { .op = OP_READ | OP_ALL_MODS, .msr = PP1_POWER_LIMIT };
+static constexpr const struct msr_batch_op op_rd_PP1_ENERGY_STATUS                  = { .op = OP_READ | OP_ALL_MODS, .msr = PP1_ENERGY_STATUS };
+static constexpr const struct msr_batch_op op_rd_PP1_POLICY                         = { .op = OP_READ | OP_ALL_MODS, .msr = PP1_POLICY };
+static constexpr const struct msr_batch_op op_rd_PLATFORM_ENERGY_COUNTER            = { .op = OP_READ | OP_ALL_MODS, .msr = PLATFORM_ENERGY_COUNTER };
+static constexpr const struct msr_batch_op op_rd_PPERF                              = { .op = OP_READ | OP_ALL_MODS, .msr = PPERF };
+static constexpr const struct msr_batch_op op_rd_PLATFORM_POWER_INFO                = { .op = OP_READ | OP_ALL_MODS, .msr = PLATFORM_POWER_INFO };
+static constexpr const struct msr_batch_op op_rd_PLATFORM_RAPL_SOCKET_PERF_STATUS   = { .op = OP_READ | OP_ALL_MODS, .msr = PLATFORM_RAPL_SOCKET_PERF_STATUS };
+static constexpr const struct msr_batch_op op_rd_PM_ENABLE                          = { .op = OP_READ | OP_ALL_MODS, .msr = PM_ENABLE };
+static constexpr const struct msr_batch_op op_rd_HWP_CAPABILITIES                   = { .op = OP_READ | OP_ALL_MODS, .msr = HWP_CAPABILITIES };
 
 //////////////////////////////////////////////////////////////////////////////////
 // Working around C initialization limitations
@@ -210,6 +251,7 @@ static const struct msr_batch_op * const fixed_function_counters__teardown[] = {
 //   update rates are relatively slow.  Doing the read during the "stop" phase
 //   eliminates a bit of measurement contamination.  Reading during the "read"
 //   phase leads to less confusion.  Prefer the latter.
+/*
 static const struct msr_batch_op * const energy_counters__setup[] = { &op_rd_RAPL_POWER_UNIT, NULL };
 static const struct msr_batch_op * const energy_counters__start[] = {
     &op_rd_PKG_ENERGY_STATUS, &op_rd_DRAM_ENERGY_STATUS, &op_rd_PP0_ENERGY_STATUS, &op_rd_PP1_ENERGY_STATUS, &op_rd_PLATFORM_ENERGY_COUNTER, NULL };
@@ -217,6 +259,32 @@ static const struct msr_batch_op * const energy_counters__stop[] = { NULL };
 static const struct msr_batch_op * const energy_counters__read[] = {
     &op_rd_RAPL_POWER_UNIT, &op_rd_PKG_ENERGY_STATUS, &op_rd_DRAM_ENERGY_STATUS, &op_rd_PP0_ENERGY_STATUS, &op_rd_PP1_ENERGY_STATUS, &op_rd_PLATFORM_ENERGY_COUNTER, NULL };
 static const struct msr_batch_op * const energy_counters__teardown[] = { NULL };
+*/
+static const struct msr_batch_op * const all_allowed__setup[] = {
+    &op_rd_TIME_STAMP_COUNTER,   &op_rd_MISC_PACKAGE_CTLS,   &op_rd_MPERF,                            &op_rd_APERF,
+    &op_rd_ARCH_CAPABILITIES,    &op_rd_PERF_STATUS,         &op_rd_THERM_STATUS,                     &op_rd_ENERGY_PERF_BIAS,
+    &op_rd_PACKAGE_THERM_STATUS, &op_rd_FIXED_CTR0,          &op_rd_FIXED_CTR1,                       &op_rd_FIXED_CTR2,
+    &op_rd_FIXED_CTR3,           &op_rd_FIXED_CTR_CTRL,      &op_rd_PERF_GLOBAL_CTRL,                 &op_rd_RAPL_POWER_UNIT,
+    &op_rd_PKG_POWER_LIMIT,      &op_rd_PKG_ENERGY_STATUS,   &op_rd_PACKAGE_ENERGY_TIME_STATUS,       &op_rd_PKG_PERF_STATUS,
+    &op_rd_PKG_POWER_INFO,       &op_rd_DRAM_POWER_LIMIT,    &op_rd_DRAM_ENERGY_STATUS,               &op_rd_DRAM_PERF_STATUS,
+    &op_rd_DRAM_POWER_INFO,      &op_rd_PP0_POWER_LIMIT,     &op_rd_PP0_ENERGY_STATUS,                &op_rd_PP0_POLICY,
+    &op_rd_PP1_POWER_LIMIT,      &op_rd_PP1_ENERGY_STATUS,   &op_rd_PP1_POLICY,                       &op_rd_PLATFORM_ENERGY_COUNTER,
+    &op_rd_PPERF,                &op_rd_PLATFORM_POWER_INFO, &op_rd_PLATFORM_RAPL_SOCKET_PERF_STATUS, &op_rd_PM_ENABLE,
+    &op_rd_HWP_CAPABILITIES };
+static const struct msr_batch_op * const all_allowed__start[]       = { NULL };
+static const struct msr_batch_op * const all_allowed__stop[]        = { NULL };
+static const struct msr_batch_op * const all_allowed__read[]        = {
+    &op_rd_TIME_STAMP_COUNTER,   &op_rd_MISC_PACKAGE_CTLS,   &op_rd_MPERF,                            &op_rd_APERF,
+    &op_rd_ARCH_CAPABILITIES,    &op_rd_PERF_STATUS,         &op_rd_THERM_STATUS,                     &op_rd_ENERGY_PERF_BIAS,
+    &op_rd_PACKAGE_THERM_STATUS, &op_rd_FIXED_CTR0,          &op_rd_FIXED_CTR1,                       &op_rd_FIXED_CTR2,
+    &op_rd_FIXED_CTR3,           &op_rd_FIXED_CTR_CTRL,      &op_rd_PERF_GLOBAL_CTRL,                 &op_rd_RAPL_POWER_UNIT,
+    &op_rd_PKG_POWER_LIMIT,      &op_rd_PKG_ENERGY_STATUS,   &op_rd_PACKAGE_ENERGY_TIME_STATUS,       &op_rd_PKG_PERF_STATUS,
+    &op_rd_PKG_POWER_INFO,       &op_rd_DRAM_POWER_LIMIT,    &op_rd_DRAM_ENERGY_STATUS,               &op_rd_DRAM_PERF_STATUS,
+    &op_rd_DRAM_POWER_INFO,      &op_rd_PP0_POWER_LIMIT,     &op_rd_PP0_ENERGY_STATUS,                &op_rd_PP0_POLICY,
+    &op_rd_PP1_POWER_LIMIT,      &op_rd_PP1_ENERGY_STATUS,   &op_rd_PP1_POLICY,                       &op_rd_PLATFORM_ENERGY_COUNTER,
+    &op_rd_PPERF,                &op_rd_PLATFORM_POWER_INFO, &op_rd_PLATFORM_RAPL_SOCKET_PERF_STATUS, &op_rd_PM_ENABLE,
+    &op_rd_HWP_CAPABILITIES };
+static const struct msr_batch_op * const all_allowed__teardown[]    = { NULL };
 
 static const struct msr_batch_op * const * const fixed_function_counters__ops[ NUM_LONGITUDINAL_EXECUTION_SLOTS ] = {
     fixed_function_counters__setup,
@@ -225,15 +293,23 @@ static const struct msr_batch_op * const * const fixed_function_counters__ops[ N
     fixed_function_counters__read,
     fixed_function_counters__teardown };
 
+static const struct msr_batch_op * const * const all_allowed__ops[ NUM_LONGITUDINAL_EXECUTION_SLOTS ] = {
+    all_allowed__setup,
+    all_allowed__start,
+    all_allowed__stop,
+    all_allowed__read,
+    all_allowed__teardown };
+
+/*
 static const struct msr_batch_op * const * const energy_counters__ops[ NUM_LONGITUDINAL_EXECUTION_SLOTS ] = {
     energy_counters__setup,
     energy_counters__start,
     energy_counters__stop,
     energy_counters__read,
     energy_counters__teardown };
-
+*/
 static const struct msr_batch_op * const * const * const longitudinal_recipes[ NUM_LONGITUDINAL_FUNCTIONS ] = {
-    fixed_function_counters__ops, energy_counters__ops };
+    fixed_function_counters__ops, all_allowed__ops };
 
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -270,7 +346,7 @@ static void setup_polling_batches( struct job *job ){
         job->polls[i]->poll_ops     = calloc( job->polls[i]->total_ops, sizeof( struct msr_batch_op ) );    assert( job->polls[i]->poll_ops );
 
         // Find the polled cpu.
-        uint16_t polled_cpu = (uint16_t)( get_next_cpu( 0, max_msrsafe_cpu, &(job->polls[i]->polled_cpu) ) );
+        uint16_t polled_cpu = (uint16_t)( get_next_cpu( 0, max_msrsafe_cpu, &(job->polls[i]->polled_cpu), NULL ) );
 
         // Create the msr_batch_op that we'll copy into all of the msr_batch_arrays.
         struct msr_batch_op op = {
@@ -350,7 +426,7 @@ static void setup_longitudinal_batches( struct job *job ){
                             longitudinal_recipes[ lng->longitudinal_type ][ slot_idx ][ op_idx ],
                             sizeof( struct msr_batch_op ) );
                     lng->batches[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ].err = UNUSED_OP;
-                    current_cpu = get_next_cpu( current_cpu, max_msrsafe_cpu, &(lng->sample_cpus) );
+                    current_cpu = get_next_cpu( current_cpu, max_msrsafe_cpu, &(lng->sample_cpus), NULL );
                     lng->batches[ slot_idx ]->ops[ (op_idx * ncpu) + cpu_idx ].cpu = current_cpu;
                     current_cpu++;
                 }
@@ -381,40 +457,49 @@ void populate_allowlist( void ) {
         exit(-1);
     }
     close(fd);
-
-    // Now test the allowlist.
-    struct msr_batch_array batch;	
+}
+/*
+static void read_all_msrs( FILE *fp, cpu_set_t *cpus ){
+    int fd;
+    struct msr_batch_array batch;
     batch.numops = 0;
     batch.version = MSR_SAFE_VERSION_u32;
     batch.ops = NULL;
     __u32 addr;
     __u64 mask; // Ignore after parsing.
-    char const *al = allowlist;
-    while( 2 == sscanf( al, "0x%x 0x%llx\n", &addr, &mask ) ){
-        al += 26; // FIXME less than robust
-	printf( "addr=0x%x, mask=0x%llx\n", addr, mask );
-	batch.numops++;
-	batch.ops = reallocarray( batch.ops, batch.numops, sizeof( struct msr_batch_op ) );
-	assert( batch.ops );
-	batch.ops[ batch.numops - 1].cpu = 0;	// FIXME should be allowed to specify a cpuset on the command line
-	batch.ops[ batch.numops - 1].op  = OP_READ;
-	batch.ops[ batch.numops - 1].err = 0;
-	batch.ops[ batch.numops - 1].msr = addr;
-	batch.ops[ batch.numops - 1].msrdata = 0;
+    bool valid_cpu = false;
+    unsigned int cpu = get_next_cpu( 0, 999, cpus, &valid_cpu );
+    while( valid_cpu ){
+        char const *al = allowlist;
+        while( al && 2 == sscanf( al, "0x%x 0x%llx\n", &addr, &mask ) ){
+            al = strchr( al, '\n' ) + 1;
+            printf( "addr=0x%x, mask=0x%llx\n", addr, mask );
+            batch.numops++;
+            batch.ops = reallocarray( batch.ops, batch.numops, sizeof( struct msr_batch_op ) );
+            assert( batch.ops );
+            batch.ops[ batch.numops - 1].cpu = cpu;
+            batch.ops[ batch.numops - 1].op  = OP_READ;
+            batch.ops[ batch.numops - 1].err = 0;
+            batch.ops[ batch.numops - 1].msr = addr;
+            batch.ops[ batch.numops - 1].msrdata = 0;
+        }
+        fd = open( "/dev/cpu/msr_batch", O_RDONLY );
+        assert( fd > 0 );
+        // Ignore return code, as not all MSRs in the allowlist will be present
+        //   on every processor.
+        ioctl( fd, X86_IOC_MSR_BATCH, &batch );
+        for( size_t i = 0; i < batch.numops; i++ ){
+            fprintf( fp, "0x%x %d %hd 0x%llx\n",
+                batch.ops[ i ].msr,
+                batch.ops[ i ].err,
+                batch.ops[ i ].cpu,
+                batch.ops[ i ].msrdata);
+        }
+        close(fd);
+        cpu = get_next_cpu( cpu+1, 999, cpus, &valid_cpu );
     }
-    fd = open( "/dev/cpu/msr_batch", O_RDONLY );
-    assert( fd > 0 );
-    ioctl( fd, X86_IOC_MSR_BATCH, &batch );
-    for( size_t i = 0; i < batch.numops; i++ ){
-        fprintf( stdout, "0x%x %d 0x%llx\n", 
-            batch.ops[ i ].msr,
-            batch.ops[ i ].err,
-            batch.ops[ i ].msrdata);
-    }
-    close(fd);
-
 }
-
+*/
 
 static void print_header( FILE* fp, uint64_t op_bitfield ){
     static bool is_first = true;
@@ -589,7 +674,7 @@ static void print_execution_counts( struct job *job ){
     for( size_t i = 0; i < job->benchmark_count; i++ ){
         fprintf( fp, "%s %u %15"PRIu64" %15"PRIu64"\n",
             benchmarktype2str[ job->benchmarks[ i ]->benchmark_type ],
-            get_next_cpu( 0, 255, &(job->benchmarks[ i ]->execution_cpu ) ),
+            get_next_cpu( 0, 255, &(job->benchmarks[ i ]->execution_cpu ), NULL ),
             job->benchmarks[ i ]->executed_loops[0],
             job->benchmarks[ i ]->executed_loops[1] );
     }
@@ -630,13 +715,7 @@ void dump_batches( struct job *job ){
                             fprintf( fp, "# 0x030a FIXED_CTR1 (CPU_CLK_UNHALTED)\n");
                             fprintf( fp, "# 0x030b FIXED_CTR2 (CPU_CLK_UNHALTED.REF_TSC)\n");
                             break;
-                        case ENERGY_COUNTERS:
-                            fprintf( fp, "# 0x0606 RAPL_POWER_UNIT\n" );
-                            fprintf( fp, "# 0x0611 PKG_ENERGY_STATUS\n" );
-                            fprintf( fp, "# 0x0619 DRAM_ENERGY_STATUS\n" );
-                            fprintf( fp, "# 0x0639 PP0_ENERGY_STATUS\n" );
-                            fprintf( fp, "# 0x0641 PP1_ENERGY_STATUS\n" );
-                            fprintf( fp, "# 0x064d PLATFORM_ENERGY_COUNTER\n" );
+                        case ALL_ALLOWED:
                             break;
                         default:
                             assert(0);
@@ -748,17 +827,9 @@ void run_longitudinal_batches( struct job *job, longitudinal_slot_t slot_idx ){
             continue;
         }
         errno = 0;
-        int rc = ioctl( fd, X86_IOC_MSR_BATCH, job->longitudinals[i]->batches[slot_idx] );
-        if( 0 != rc ){
-            dump_batches( job );
-            fprintf( stderr, "%s:%d:%s ioctl failed with code (%d):  %s.\n"
-                             "         longitudinal batch type = %d.\n"
-                             "         slot = %d.\n",
-                    __FILE__, __LINE__, __func__, errno, strerror( errno ),
-                    job->longitudinals[i]->longitudinal_type,
-                    slot_idx);
-            exit(-1);
-        }
+        // Ignore return code, as ALL_ALLOWED will generate errors due to not
+        //   all allowed MSRs being present on all architectures.
+        ioctl( fd, X86_IOC_MSR_BATCH, job->longitudinals[i]->batches[slot_idx] );
     }
 
     if( slot_idx == TEARDOWN ){

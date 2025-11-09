@@ -14,53 +14,60 @@
 #include "timespec_utils.h"
 
 static void print_help( void ){
-    printf( "var [options]\n" );
-    printf( "  Version %"PRIu64".\n", var_version );
-    printf( "  Built %s, %s.\n", __DATE__, __TIME__ );
-    printf( "\n");
-    printf( "Options:\n" );
-    printf( "  -h / --help      Print this message and exit.\n");
-    printf( "  -v / --version   Print version information and exit.\n");
-    printf( "\n");
-    printf( "  -t / --time=<timespec> (Default is 10 seconds)\n");
-    printf( "\n");
-    printf( "  -m / --main=<main_cpu>\n");
-    printf( "  -b / --benchmark=<benchmark_type>:<execution_cpus>:<param1>:<param2>:<param3>\n");
-    printf( "  -l / --longitudinal=<longitudinal_type>:<sample_cpus>\n");
-    printf( "  -p / --poll=<msr_address>:<flags>:<timespec>:<control_cpu>:<sample_cpu>\n");
-    printf( "\n");
-    printf( "  -R / --abRandomized (enables random a|b selection)\n");
-    printf( "  -T / --abTime=<timespec> (default is 1 second)\n");
-    printf( "\n");
-    printf( "The available benchmarks are SPIN, and ABSHIFT.\n");
-    printf( "\n");
-    printf( "The <longitudinal_type> may be either\n");
-    printf( "  FIXED_FUNCTION_COUNTERS\n");
-    printf( "    The counter accumulators for instructions retired, reference\n");
-    printf( "    cycles, and cycle counts will be zeroed out before the start\n");
-    printf( "    of the benchmark(s) and read out after <duration> seconds\n");
-    printf( "    elapse.\n");
-    printf( "  ENERGY_COUNTERS\n");
-    printf( "    All possible counters are read, but only a subset will be present\n");
-    printf( "    on any particular processor.  Check the error field for whether or\n");
-    printf( "    not a reading is meaningful.  All values are package-scope.\n");
-    printf( "\n");
-    printf( "The several <cpu> fields expect CPU numbering of the type used by\n");
-    printf( "  sched_setaffinity(2).  These can take the form of a single integer,\n");
-    printf( "  or comma-separate single integers and ranges of integers m-n, where\n");
-    printf( "  m<n.  With the exception of the longitudinal <sample_cpus>, each\n");
-    printf( "  cpu should be unique.  Ideally, <execution_cpus> and <sample_cpus>\n");
-    printf( "  should take up all CPUs on an isolated socket, while each\n");
-    printf( "  <control_cpu> and the single <main_cpu> share a socket with, say,\n");
-    printf( "  operating system background tasks.\n");
-    printf( "\n");
-    printf( "A <timespec> is a non-negative integer following by an optional suffix,\n");
-    printf( "  \"ns\", \"us\", \"ms\", \"s\", \"m\", or \"h\", corresponding to\n");
-    printf( "  to nanoseconds, microseconds, milliseconds, seconds, minutes, or hours,\n");
-    printf( "  respectively.  The absence of a suffix implies seconds.\n");
-    printf( "\n");
-    printf( "The <flags> field can be any of the following, possibly OR'd together with '+'.\n");
-    printf( "\n");
+    printf("var [options]\n" );
+    printf("  Version %"PRIu64".\n", var_version );
+    printf("  Built %s, %s.\n", __DATE__, __TIME__ );
+    printf("\n");
+    printf(
+    "Options:\n" 
+    "  -h / --help      Print this message and exit.\n"
+    "  -v / --version   Print version information and exit.\n"
+    "\n"
+    "  -t / --time=<timespec> (Default is 10 seconds)\n"
+    "\n"
+    "  -m / --main=<main_cpu>\n"
+    "  -b / --benchmark=<benchmark_type>:<execution_cpus>:<param1>:<param2>:<param3>\n"
+    "  -l / --longitudinal=<longitudinal_type>:<sample_cpus>\n"
+    "  -p / --poll=<msr_address>:<flags>:<timespec>:<control_cpu>:<sample_cpu>\n"
+    "\n"
+    "  -R / --abRandomized (enables random a|b selection)\n"
+    "  -T / --abTime=<timespec> (default is 1 second)\n"
+    "\n"
+    "The available benchmarks are SPIN, and ABSHIFT.\n"
+    "  SPIN\n"
+    "    No parameters are used.  This benchmark is a simple integer spin loop.\n"
+    "  ABSHIFT\n"
+    "    The benchmark alternates between shifting 64-bit values <param1> and <param2>\n"
+    "    back and forth by <param3> bits.  The <param1> and <param2> values can be\n"
+    "    specified using regular hexidecimal notation (to use particular bits) or by\n"
+    "    using hwN to generate a value with a Hamming Weight of N.  The latter will\n"
+    "    begin by filling in odd-numbered bits starting with the least-significant and\n"
+    "    excepting bit 63, then then (if needed) the even-numbered bits excepting bit 0\n"
+    "    and finally bits 0 and 63.  The shift value (<param3>) may be 0; this is useful\n"
+    "    when measuring only parasitic power.\n"
+    "\n"
+    "The <longitudinal_type> may be either\n"
+    "  FIXED_FUNCTION_COUNTERS\n"
+    "    The counter accumulators for instructions retired, reference\n"
+    "    cycles, and cycle counts will be zeroed out before the start\n"
+    "    of the benchmark(s) and read out after <duration> seconds\n"
+    "    elapse.\n"
+    "The several <cpu> fields expect CPU numbering of the type used by\n"
+    "  sched_setaffinity(2).  These can take the form of a single integer,\n"
+    "  or comma-separate single integers and ranges of integers m-n, where\n"
+    "  m<n.  With the exception of the longitudinal <sample_cpus>, each\n"
+    "  cpu should be unique.  Ideally, <execution_cpus> and <sample_cpus>\n"
+    "  should take up all CPUs on an isolated socket, while each\n"
+    "  <control_cpu> and the single <main_cpu> share a socket with, say,\n"
+    "  operating system background tasks.\n"
+    "\n"
+    "A <timespec> is a non-negative integer following by an optional suffix,\n"
+    "  \"ns\", \"us\", \"ms\", \"s\", \"m\", or \"h\", corresponding to\n"
+    "  to nanoseconds, microseconds, milliseconds, seconds, minutes, or hours,\n"
+    "  respectively.  The absence of a suffix implies seconds.\n"
+    "\n"
+    "The <flags> field can be any of the following, possibly OR'd together with '+'.\n"
+    "\n");
     for( uint16_t i = 1; i < MAX_OP_VAL; ){
         printf("\t");
         for( size_t j = 0; j < 4 && i < MAX_OP_VAL; j++, i *= 2 ){
@@ -69,8 +76,17 @@ static void print_help( void ){
         printf("\n");
     }
     printf( "\n");
-    printf( "  For example, polling a register and capturing the core and processor\n");
-    printf( "  temperature would be expressed by OP_POLL+OP_THERM+OP_PTHERM.\n");
+    printf(
+    "  For example, polling a register and capturing the core and processor\n"
+    "  temperature would be expressed by OP_POLL+OP_THERM+OP_PTHERM.\n"
+    "  Note that specifying a <timespec> for polling delays the start of the\n"
+    "  next poll command by that number of seconds.  This delay can reduce\n"
+    "  the amount of energy due to polling the register, but potentially at the\n"
+    "  cost of invalidating APERF and MPERF measurements due to the CPU sleeping\n"
+    "  during the delay.\n"
+    "\n"
+    "  Also note that --poll repeats the operation every <timespec> seconds, and\n"
+    "  OP_POLL reads the MSR until its value changes or MAX_POLL_ATTEMPTS is exceeded.\n");
 }
 
 static void print_options( int argc, char **argv, struct job *job ){
@@ -161,6 +177,37 @@ static void print_options( int argc, char **argv, struct job *job ){
         fprintf(fp, "\n");
     }
     fclose(fp);
+}
+
+static uint64_t create_hw_param( char *param ){
+    // Input is a string representing a integer, possibly prefaced by "hw".
+    // If hw is present, return a value with that Hamming Weight.
+    // Otherwise, just return the value.
+    uint64_t v = 0;
+    if( (strlen( param ) >= 2) && ( 0 == strncmp( "hw", param, 2 ) ) ){
+
+        uint64_t hw = safe_strtoull( &param[2] );
+
+        // Start by setting the odd bits from 1-61
+        for( size_t i = 1; (i < 63) && hw; i+=2, hw-- ){
+            v |= 1 << i;
+        }
+        // Then set the even bits from 2-62.
+        for( size_t i = 2; (i < 64) && hw; i+=2, hw-- ){
+            v |= 1 << i;
+        }
+        // Then bits 0...
+        if( hw ){
+            v |= 1; hw--;
+        }
+        // ...and 63.
+        if( hw ){
+            v |= 1ull << 63; hw--;
+        }
+    }else{
+        v = safe_strtoull( param );
+    }
+    return v;
 }
 
 void parse_options( int argc, char **argv, struct job *job ){
@@ -266,7 +313,7 @@ void parse_options( int argc, char **argv, struct job *job ){
                 if( 0 == strcmp( longitudinaltype2str[0], lng_type ) ){
                     lng->longitudinal_type = FIXED_FUNCTION_COUNTERS;
                 }else if ( 0 == strcmp( longitudinaltype2str[1], lng_type ) ){
-                    lng->longitudinal_type = ENERGY_COUNTERS;
+                    lng->longitudinal_type = ALL_ALLOWED;
                 }else{
                     printf( "%s:%d:%s Unknown longitudinal type (%s).\n",
                             __FILE__, __LINE__, __func__, lng_type );
@@ -330,8 +377,8 @@ void parse_options( int argc, char **argv, struct job *job ){
                 assert( job->benchmarks );
 
                 // Grab the parameters
-                uint64_t benchmark_param1 = safe_strtoull( bch_param1 );
-                uint64_t benchmark_param2 = safe_strtoull( bch_param2 );
+                uint64_t benchmark_param1 = create_hw_param( bch_param1 );
+                uint64_t benchmark_param2 = create_hw_param( bch_param2 );
                 uint64_t benchmark_param3 = safe_strtoull( bch_param3 );
 
                 // Allocate and fill in the structs.
@@ -353,7 +400,7 @@ void parse_options( int argc, char **argv, struct job *job ){
                     }
 
                     // cpu
-                    current_cpu = get_next_cpu( current_cpu, 255, &all_cpus );
+                    current_cpu = get_next_cpu( current_cpu, 255, &all_cpus, NULL );
                     cpu2cpuset( current_cpu++, &(job->benchmarks[ bch_idx ]->execution_cpu) );
 
                     // Parameters

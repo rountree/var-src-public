@@ -8,8 +8,8 @@
 typedef enum{                                      SPIN,   ABSHIFT  } benchmark_t;
 static const char * const benchmarktype2str[] = { "SPIN", "ABSHIFT" };
 
-typedef enum{                                        FIXED_FUNCTION_COUNTERS,   ENERGY_COUNTERS, NUM_LONGITUDINAL_FUNCTIONS, } longitudinal_t;
-static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS", "ENERGY_COUNTERS"                             };
+typedef enum{                                        FIXED_FUNCTION_COUNTERS,   ALL_ALLOWED, NUM_LONGITUDINAL_FUNCTIONS, } longitudinal_t;
+static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS", "ALL_ALLOWED"                             };
 
 typedef enum{
     // For longitudinal recipes like fixed function performance counters, we want

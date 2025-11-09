@@ -12,3 +12,4 @@ void run_longitudinal_batches( struct job *job, longitudinal_slot_t j );
 op_flag_t str2flags( const char * const s );
 char* flags2str( op_flag_t flags );
 void fprintf_flags( FILE* fp, op_flag_t flags );
+//void read_all_msrs( FILE* fp, cpu_set_t *cpus );

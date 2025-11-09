@@ -83,18 +83,19 @@ void str2cpuset( const char * const s, cpu_set_t *cpuset ){
     free( local_s );
 }
 
-unsigned int get_next_cpu( unsigned int start_cpu, unsigned int max_cpu, cpu_set_t *cpus ){
-    // msr-safe currently uses a __u16 datatype to hold the cpu id.
-    // This will be changing in the v2.0 release.
-    // Reminder for writing non-production code:  if something unexpected happens, fall over
-    // and die.
+unsigned int get_next_cpu( unsigned int start_cpu, unsigned int max_cpu, cpu_set_t *cpus, bool *valid ){
     do{
         if( CPU_ISSET( start_cpu, cpus ) ){
+            if( NULL != valid ){
+                *valid = true;
+            }
             return start_cpu;
         }
         start_cpu++;
     }while( start_cpu < CPU_SETSIZE && start_cpu < max_cpu );
-    assert(0);
+    if( NULL != valid ){
+        *valid = false;
+    }
     return 0;
 }
 
