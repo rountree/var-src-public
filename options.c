@@ -190,15 +190,15 @@ static uint64_t create_hw_param( char *param ){
 
         // Start by setting the odd bits from 1-61
         for( size_t i = 1; (i < 63) && hw; i+=2, hw-- ){
-            v |= 1 << i;
+            v |= 1ull << i;
         }
         // Then set the even bits from 2-62.
         for( size_t i = 2; (i < 64) && hw; i+=2, hw-- ){
-            v |= 1 << i;
+            v |= 1ull << i;
         }
         // Then bits 0...
         if( hw ){
-            v |= 1; hw--;
+            v |= 1ull; hw--;
         }
         // ...and 63.
         if( hw ){
