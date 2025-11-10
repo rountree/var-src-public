@@ -6,7 +6,7 @@ void run_spin( struct benchmark_config *b ){
     b->executed_loops[ 0 ] += accumulator;
 }
 
-void run_abxor( struct benchmark_config *b ){
+void run_abshift( struct benchmark_config *b ){
 
     // If you touch this code, make sure to check to see if the compiler
     // optimized away the actual shift instructions.  Some of what's going

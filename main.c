@@ -97,7 +97,7 @@ void* benchmark_thread_start( void *v ){
     if( job.benchmarks[ benchmark_idx ]->benchmark_type == SPIN ){
         run_spin( job.benchmarks[ benchmark_idx ] );
     }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == ABSHIFT ){
-        run_abxor( job.benchmarks[ benchmark_idx ] );
+        run_abshift( job.benchmarks[ benchmark_idx ] );
     }
     return 0;
 }
