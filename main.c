@@ -105,6 +105,7 @@ void* benchmark_thread_start( void *v ){
 int main( int argc, char **argv ){
 
     srandom(13);
+    setup_abxor();      // only needed for abxor.
     sizeof_check();
     parse_options( argc, argv, &job );
     populate_allowlist();
