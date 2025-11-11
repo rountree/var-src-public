@@ -734,17 +734,63 @@ void dump_batches( struct job *job ){
         }
     }
 
-//    fprintf( stderr, "%s:%d:%s Dumping polling batches.\n", __FILE__, __LINE__, __func__ );
     if( job->poll_count ){
+
+        static char filename[2048];
 
         // polls
         manage_energy_rollover( job );
-        //print_summaries( job );   FIXME
 
-        // Raw dump
+
         for( size_t i = 0; i < job->poll_count; i++ ){
+            // ABXOR dump
+            // Should really do this based on poll type, which we've already gotten rid of once.
+            if( job->polls[i]->benchmark_output ){
+                snprintf( filename, 2047, "./poll_ABXOR.out" );
+                FILE *fp = fopen( filename, "w" );
+                fprintf( fp, "key enc hw fJ vote "
+                             "v0 v1 v2 v3 v4 v5 v6 v7 "             // Cumulative vote
+                             "v8 v9 v10 v11 v12 v13 v14 v15 "
+                             "v16 v17 v18 v19 v20 v21 v22 v23 "
+                             "v24 v25 v26 v27 v28 v29 v30 v31 "
+                             "v32 v33 v34 v35 v36 v37 v38 v39 "
+                             "v40 v41 v42 v43 v44 v45 v46 v47 "
+                             "v48 v49 v50 v51 v52 v53 v54 v55 "
+                             "v56 v57 v58 v59 v60 v61 v62 v63 "
+                             "\n");
 
-            static char filename[2048];
+                uint64_t key, enc;
+                int hw;
+                uint64_t fJ;
+                double vote;
+                double v[64] = {0.0};   // Cumulative vote.
+
+                for( size_t o = 0; o < job->polls[i]->total_ops; o++ ){
+                    if( job->polls[i]->poll_ops[o].err == UNUSED_OP ){
+                        break;
+                    }
+                    key = job->polls[i]->key;   // Convenience, shouldn't change
+                    enc = job->polls[i]->benchmark_output[ o ];
+                    hw  = __builtin_popcount( job->polls[i]->benchmark_output[ o ] );
+                    fJ  = job->polls[i]->poll_ops[o].msrdata2 - job->polls[i]->poll_ops[o].msrdata; // FIXME Doesn't handle sw polling rate > hw polling rate
+                    vote= fJ /(double)(hw);
+
+                    for( size_t j = 0; j < 64; j++ ){
+                        if( enc & (1 << j) ){
+                            v[j] += vote;
+                        }
+                    }
+
+                    fprintf( fp, "%#"PRIx64" %#"PRIx64" %d %"PRIu64" %lf ", key, enc, hw, fJ, vote );
+                    for( size_t j = 0; j < 64; j++ ){
+                        fprintf( fp, "%lf ", v[j] );
+                    }
+                    fprintf( fp, "\n" );
+                }
+                fclose( fp );
+            }
+
+            // Raw dump
             snprintf( filename, 2047, "./poll_%zu.raw", i );
             FILE *fp = fopen( filename, "w" );
             assert( NULL != fp );

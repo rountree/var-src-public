@@ -47,6 +47,8 @@ void setup_abxor( void ){
 uint64_t local; // Make global so run_abxor has to use it.
 void run_abxor( struct benchmark_config *b ){
 
+    b->key = R[0];
+
     uint64_t accumulator[2] = {};
     size_t Ridx = 1;    // 0 is for the key.
     bool local_ab_selector = *(b->ab_selector);

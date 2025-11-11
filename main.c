@@ -84,7 +84,15 @@ void* poll_thread_start( void *v ){
             perror("");
             exit(-1);
         }
-        if( job.polls[i]->benchmark_output && job.polls[i]->single_output_ptr){ job.polls[i]->benchmark_output[b] = *(job.polls[i]->single_output_ptr); }
+        if( job.polls[i]->benchmark_output && job.polls[i]->single_output_ptr){
+            job.polls[i]->benchmark_output[b] = *(job.polls[i]->single_output_ptr);
+        }
+        // Grab the first key that shows up.
+        if( !(job.polls[i]->key) ){
+            if( job.polls[i]->key_ptr ){
+                job.polls[i]->key = *(job.polls[i]->key_ptr);
+            }
+        }
         nanosleep( &job.polls[i]->interval, NULL );
     }
     close( fd );
@@ -144,6 +152,7 @@ int main( int argc, char **argv ){
                 assert( job.polls[0]->benchmark_output );
                 job.polls[0]->single_output_ptr = &(job.benchmarks[0]->single_output);
                 job.polls[0]->key_ptr = &(job.benchmarks[0]->key);
+                fprintf( stderr, "job.polls[0]->key_ptr set to %p\n", job.polls[0]->key_ptr );
             }
         }
 
