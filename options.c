@@ -33,7 +33,7 @@ static void print_help( void ){
     "  -R / --abRandomized (enables random a|b selection)\n"
     "  -T / --abTime=<timespec> (default is 1 second)\n"
     "\n"
-    "The available benchmarks are SPIN, and ABSHIFT.\n"
+    "The available benchmarks are SPIN, ABSHIFT, and ABXOR.\n"
     "  SPIN\n"
     "    No parameters are used.  This benchmark is a simple integer spin loop.\n"
     "  ABSHIFT\n"
@@ -45,6 +45,8 @@ static void print_help( void ){
     "    excepting bit 63, then then (if needed) the even-numbered bits excepting bit 0\n"
     "    and finally bits 0 and 63.  The shift value (<param3>) may be 0; this is useful\n"
     "    when measuring only parasitic power.\n"
+    "  ABXOR\n"
+    "    Benchmark still under development.\n"
     "\n"
     "The <longitudinal_type> may be either\n"
     "  FIXED_FUNCTION_COUNTERS\n"
@@ -393,6 +395,8 @@ void parse_options( int argc, char **argv, struct job *job ){
                         job->benchmarks[ bch_idx ]->benchmark_type = SPIN;
                     }else if( 0 == strcmp( benchmarktype2str[ABSHIFT], bch_type ) ){
                         job->benchmarks[ bch_idx ]->benchmark_type = ABSHIFT;
+                    }else if( 0 == strcmp( benchmarktype2str[ABXOR], bch_type ) ){
+                        job->benchmarks[ bch_idx ]->benchmark_type = ABXOR;
                     }else{
                         printf( "%s:%d:%s Unknown benchmark type (%s).\n",
                                 __FILE__, __LINE__, __func__, bch_type );
@@ -475,10 +479,10 @@ void parse_options( int argc, char **argv, struct job *job ){
                 pll->msr = (uint32_t)safe_strtoull( pll_msr_str );
                 pll->flags = str2flags( pll_flags_str );
                 str2timespec( pll_timespec_str, &pll->interval );
-		if( pll->interval.tv_sec == 0 && pll->interval.tv_nsec == 0 ){
-			fprintf( stderr, "Polling interval cannot be 0.\n" );
-			exit(-1);
-		}
+                if( pll->interval.tv_sec == 0 && pll->interval.tv_nsec == 0 ){
+                    fprintf( stderr, "Polling interval cannot be 0.\n" );
+                    exit(-1);
+                }
                 str2cpuset( pll_polled_cpuset_str, &pll->polled_cpu );
                 str2cpuset( pll_control_cpuset_str, &pll->control_cpu );
                 free(local_optarg);

@@ -38,6 +38,7 @@ static void sizeof_check( void ){
 static struct job job;
 
 static void cleanup( void ){
+    free( job.polls[0]->benchmark_output );
     for( size_t i = 0; i < job.poll_count; i++ ){
         free( job.polls[i]->local_optarg );
         free( job.polls[i] );
@@ -83,6 +84,7 @@ void* poll_thread_start( void *v ){
             perror("");
             exit(-1);
         }
+        if( job.polls[i]->benchmark_output && job.polls[i]->single_output_ptr){ job.polls[i]->benchmark_output[b] = *(job.polls[i]->single_output_ptr); }
         nanosleep( &job.polls[i]->interval, NULL );
     }
     close( fd );
@@ -98,6 +100,8 @@ void* benchmark_thread_start( void *v ){
         run_spin( job.benchmarks[ benchmark_idx ] );
     }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == ABSHIFT ){
         run_abshift( job.benchmarks[ benchmark_idx ] );
+    }else if( job.benchmarks[ benchmark_idx ]->benchmark_type == ABXOR ){
+        run_abxor( job.benchmarks[ benchmark_idx ] );
     }
     return 0;
 }
@@ -113,31 +117,51 @@ int main( int argc, char **argv ){
     // Pin the main thread to the cpu requested.
     assert( 0 == sched_setaffinity( 0, sizeof( cpu_set_t ), &( job.main_cpu) ) );
 
-    // Benchmark thread initialization
-    for( uint64_t i = 0; i < job.benchmark_count; i++ ){
-
-        // Point to the global halt and ab_selector variables
-        job.benchmarks[i]->halt        = &job.halt;
-        job.benchmarks[i]->ab_selector = &job.ab_selector;
-
-        // Set up each thread.
-        assert( 0 == pthread_mutex_init( &(job.benchmarks[i]->benchmark_mutex), NULL ) );
-        assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutex) ) );
-        assert( 0 == pthread_create(     &(job.benchmarks[i]->benchmark_thread), NULL, benchmark_thread_start, (void*)i ) );
-    }
-
     // Poll thread initialization
     for( size_t i = 0; i < job.poll_count; i++ ){
 
         // Set up the single thread in each poll
         assert( 0 == pthread_mutex_init( &(job.polls[i]->poll_mutex), NULL ) );
         assert( 0 == pthread_mutex_lock( &(job.polls[i]->poll_mutex) ) );
-        assert( 0 == pthread_create(     &(job.polls[i]->poll_thread),
-                    NULL, poll_thread_start, (void*)i ) );
+        assert( 0 == pthread_create(     &(job.polls[i]->poll_thread), NULL, poll_thread_start, (void*)i ) );
+
+        if( 0 == i ){
+            job.polls[0]->key = 0;
+            job.polls[0]->key_ptr = NULL;               // memory held by benchmark.
+            job.polls[0]->single_output_ptr = NULL;     // memory held by benchmark.
+            job.polls[0]->benchmark_output = NULL;      // Move results here during each sample.
+        }
     }
+    fprintf( stderr, "%s:%d:%s Poll thread initialization completed.\n", __FILE__, __LINE__, __func__ );
+
+    // Benchmark thread initialization
+    for( uint64_t i = 0; i < job.benchmark_count; i++ ){
+
+        // Setup for instance 0.
+        if( 0 == i && job.benchmarks[0]->benchmark_type == ABXOR ){     // Setup output only once, only for ABXOR,
+            if( job.poll_count > 0 ){                                   // and only if we're polling.
+                job.polls[0]->benchmark_output = calloc( job.polls[0]->total_ops, sizeof( uint64_t ) );
+                assert( job.polls[0]->benchmark_output );
+                job.polls[0]->single_output_ptr = &(job.benchmarks[0]->single_output);
+                job.polls[0]->key_ptr = &(job.benchmarks[0]->key);
+            }
+        }
+
+        // Point to the global halt and ab_selector variables
+        job.benchmarks[i]->halt          = &job.halt;
+        job.benchmarks[i]->ab_selector   = &job.ab_selector;
+
+        // Set up each thread.
+        assert( 0 == pthread_mutex_init( &(job.benchmarks[i]->benchmark_mutex), NULL ) );
+        assert( 0 == pthread_mutex_lock( &(job.benchmarks[i]->benchmark_mutex) ) );
+        assert( 0 == pthread_create(     &(job.benchmarks[i]->benchmark_thread), NULL, benchmark_thread_start, (void*)i ) );
+    }
+    fprintf( stderr, "%s:%d:%s Benchmark thread initialization completed.\n", __FILE__, __LINE__, __func__ );
+
 
     run_longitudinal_batches( &job, SETUP );
     run_longitudinal_batches( &job, START );
+    fprintf( stderr, "%s:%d:%s Longitudinal batches SETUP and START  completed.\n", __FILE__, __LINE__, __func__ );
 
     // Poll thread start
     for( size_t i = 0; i < job.poll_count; i++ ){
@@ -176,6 +200,7 @@ int main( int argc, char **argv ){
             ( job.ab_duration.tv_nsec + elapsed.tv_nsec > 999'999'999L ? 1 : 0 );
         elapsed.tv_nsec = ( job.ab_duration.tv_nsec + elapsed.tv_nsec ) % 999'999'999L;
     }while( elapsed.tv_sec < job.duration.tv_sec );
+    fprintf( stderr, "%s:%d:%s Shutting down.\n", __FILE__, __LINE__, __func__ );
 
     // Ring the bell.
     job.halt = true;
@@ -184,16 +209,19 @@ int main( int argc, char **argv ){
     for( uint32_t i = 0; i < job.benchmark_count; i++ ){
         assert( 0 == pthread_join( job.benchmarks[i]->benchmark_thread, NULL ) );
     }
+    fprintf( stderr, "%s:%d:%s  Benchmark threads joined.\n", __FILE__, __LINE__, __func__ );
 
     // Poll thread join
     for( size_t i = 0; i < job.poll_count; i++ ){
         assert( 0 == pthread_join( job.polls[i]->poll_thread, NULL ) );
     }
+    fprintf( stderr, "%s:%d:%s  Polling threads joined.\n", __FILE__, __LINE__, __func__ );
 
     //printf("# a|b iterations:  %"PRIu64", %"PRIu64".\n", iterations[0], iterations[1]); FIXME
 
     run_longitudinal_batches( &job, STOP );
     run_longitudinal_batches( &job, READ );
+    fprintf( stderr, "%s:%d:%s  Longitudinal batches STOP and READ complete.\n", __FILE__, __LINE__, __func__ );
     dump_batches( &job );
 
     // Benchmark thread cleanup
@@ -202,6 +230,9 @@ int main( int argc, char **argv ){
     }
 
     run_longitudinal_batches( &job, TEARDOWN );
+    fprintf( stderr, "%s:%d:%s  Longitudinal batches TEARDOWN complete.\n", __FILE__, __LINE__, __func__ );
     teardown_msrsafe_batches( &job );
+    fprintf( stderr, "%s:%d:%s  Batch teardown complete.\n", __FILE__, __LINE__, __func__ );
     cleanup();
+    fprintf( stderr, "%s:%d:%s  Cleanup complete.\n", __FILE__, __LINE__, __func__ );
 }

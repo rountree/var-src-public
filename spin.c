@@ -31,7 +31,7 @@ void run_abshift( struct benchmark_config *b ){
     b->executed_loops[ 1 ] += accumulator[ 1 ];
 }
 
-#define NR (size_t)(1024ull * 1024ull * 1024ull )
+#define NR (size_t)(1024ull * 1024ull )
 static uint64_t *R; // Shared across all abxor threads.
 
 void setup_abxor( void ){
@@ -44,8 +44,31 @@ void setup_abxor( void ){
     fprintf( stderr, "Random number generation complete.\n");
 }
 
-/*
+uint64_t local; // Make global so run_abxor has to use it.
 void run_abxor( struct benchmark_config *b ){
 
+    uint64_t accumulator[2] = {};
+    size_t Ridx = 1;    // 0 is for the key.
+    bool local_ab_selector = *(b->ab_selector);
+    for( ; ! (*(b->halt)); accumulator[local_ab_selector]++ ){
+        if( local_ab_selector != *(b->ab_selector) ){
+            local_ab_selector = *(b->ab_selector);
+            if( Ridx + b->benchmark_param1 < NR - b->benchmark_param1 ){
+                Ridx += b->benchmark_param1;
+            }else{
+                Ridx = 1;
+            }
+        }
+        for( size_t i = 0; i < 1000; i++ ){
+            local = 0;
+            for( uint64_t i = 0; i < b->benchmark_param1; i++ ){
+                local ^= R[ Ridx + i ];
+            }
+            local ^= R[ 0 ];
+            b->single_output = local;
+        }
+    }
+    b->executed_loops[0] = accumulator[0];
+    b->executed_loops[1] = accumulator[1];
 }
-*/
+

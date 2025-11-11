@@ -688,6 +688,7 @@ void dump_batches( struct job *job ){
         print_execution_counts( job );
     }
 
+    //fprintf( stderr, "%s:%d:%s Dumping longitudinal batches.\n", __FILE__, __LINE__, __func__ );
     if( job->longitudinal_count ){
 
         // longitudinals
@@ -733,6 +734,7 @@ void dump_batches( struct job *job ){
         }
     }
 
+//    fprintf( stderr, "%s:%d:%s Dumping polling batches.\n", __FILE__, __LINE__, __func__ );
     if( job->poll_count ){
 
         // polls

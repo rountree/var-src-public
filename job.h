@@ -5,8 +5,8 @@
 #include <stdint.h>
 #include <pthread.h>
 
-typedef enum{                                      SPIN,   ABSHIFT  } benchmark_t;
-static const char * const benchmarktype2str[] = { "SPIN", "ABSHIFT" };
+typedef enum{                                      SPIN,   ABSHIFT,   ABXOR  } benchmark_t;
+static const char * const benchmarktype2str[] = { "SPIN", "ABSHIFT", "ABXOR" };
 
 typedef enum{                                        FIXED_FUNCTION_COUNTERS,   ALL_ALLOWED, NUM_LONGITUDINAL_FUNCTIONS, } longitudinal_t;
 static const char * const longitudinaltype2str[] = {"FIXED_FUNCTION_COUNTERS", "ALL_ALLOWED"                             };
@@ -35,6 +35,17 @@ struct poll_config{
     struct msr_batch_op         *poll_ops;      // Each batch points to a single op (the POLL instruction)
     pthread_t                   poll_thread;
     pthread_mutex_t             poll_mutex;
+
+    // The idea here is that we want to capture the current "encrypted" output at each
+    // sample without using synchronization.  All benchmark threads will be moving their
+    // "encrypted" value into their own "single_output" field; the polling thread will just
+    // be aware of one of them.  At each sample, the polling thread will copy the contents of
+    // single_output into the benchmark_output array, using the same index for polling samples.
+    uint64_t                    key;                    // Initialized to NULL by poll, set by benchmark if needed.
+    uint64_t                    *key_ptr;               //  "
+    uint64_t                    *single_output_ptr;     //  "
+    uint64_t                    *benchmark_output;      //  "
+
 };
 
 struct benchmark_config{
@@ -49,6 +60,9 @@ struct benchmark_config{
     pthread_mutex_t             benchmark_mutex;
     volatile bool               *halt;
     volatile bool               *ab_selector;   // See notes in struct job.
+
+    uint64_t                    key;
+    uint64_t                    single_output;
 };
 
 struct longitudinal_config{
