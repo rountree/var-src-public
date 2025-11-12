@@ -31,7 +31,7 @@ void run_abshift( struct benchmark_config *b ){
     b->executed_loops[ 1 ] += accumulator[ 1 ];
 }
 
-#define NR (size_t)(1024ull * 1024ull )
+#define NR (size_t)( 1024ull * 1024ull * 1024ull )
 static uint64_t *R; // Shared across all abxor threads.
 
 void setup_abxor( void ){
@@ -39,7 +39,12 @@ void setup_abxor( void ){
     fprintf( stderr, "Starting random number generation...\n" );
     assert( 0 == posix_memalign( (void**)(&R), sysconf(_SC_PAGESIZE), NR * sizeof(uint64_t) ) );
     for( size_t i = 0; i < NR; i++ ){
-        R[i] = random();
+        // FIXME several ways to optimize this, but for now I'm still mad.
+        R[i] = // because random() returns a 64-bit integer containing 31 random bits.
+                  ((uint64_t)(random()))                        // bits  0-30
+            | ( ( ((uint64_t)(random())) & 1ull ) << 31ull )    // bit     31
+            | ( ( ((uint64_t)(random()))        ) << 32ull )    // bits 32-62
+            | ( ( ((uint64_t)(random())) & 1ull ) << 63ull );   // bit     63
     }
     fprintf( stderr, "Random number generation complete.\n");
 }

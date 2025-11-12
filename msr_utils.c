@@ -746,6 +746,60 @@ void dump_batches( struct job *job ){
             // ABXOR dump
             // Should really do this based on poll type, which we've already gotten rid of once.
             if( job->polls[i]->benchmark_output ){
+
+                // File chores
+                snprintf( filename, 2047, "./poll_ABXOR_simple.out" );
+                FILE *fp = fopen( filename, "w" );
+
+                // Get the key and print its bits as 64 columns in the first row.
+                // No headers.
+                uint64_t key = job->polls[i]->key;
+                for( size_t j = 0; j < 64; j++ ){
+                    fprintf( fp, "%d ", !!(key & (1ull << j)) );
+                }
+                fprintf( fp, "\n" );
+
+                // Set up cumulative voting array.
+                double v[64] = {0.0};   // Cumulative vote.
+
+                // iterate over all of our ops.
+                for( size_t o = 0; o < job->polls[i]->total_ops; o++ ){
+                    if( job->polls[i]->poll_ops[o].err == UNUSED_OP ){
+                        break;
+                    }
+                    if( (job->polls[i]->poll_ops[o].tag & 0x1ull) == 0 ){
+                        continue;   // Ignore measurements that span A|B boundaries.
+                    }
+                    // Get the result of the last xor (the "encoded" value)
+                    uint64_t enc = job->polls[i]->benchmark_output[ o ];
+
+                    // How many 1s are it in?
+                    uint64_t hw  = __builtin_popcount( enc );
+
+                    // How many fractional Joules were consumed encoding that repeatedly?
+                    uint64_t fJ  = job->polls[i]->poll_ops[o].msrdata2 - job->polls[i]->poll_ops[o].msrdata; // FIXME Doesn't handle sw polling rate > hw polling rate
+
+                    // Divide fractional joules by the number of 1 bits.
+                    double vote = fJ /(double)(hw);
+
+                    // Update the cumulative vote
+                    for( size_t j = 0; j < 64; j++ ){
+                        if( enc & (1ull << j) ){
+                            v[j] += vote;
+                        }
+                    }
+
+                    // Every 10k operations, print out the cumulative vote.
+                    if( o % 10'000 == 0 ){
+                        for( size_t j = 0; j < 64; j++ ){
+                            fprintf( fp, "%lf ", v[j] );
+                        }
+                        fprintf( fp, "\n" );
+                    }
+                }
+                fclose( fp );
+
+#if 0
                 snprintf( filename, 2047, "./poll_ABXOR.out" );
                 FILE *fp = fopen( filename, "w" );
                 fprintf( fp, "key enc hw fJ vote "
@@ -776,7 +830,7 @@ void dump_batches( struct job *job ){
                     vote= fJ /(double)(hw);
 
                     for( size_t j = 0; j < 64; j++ ){
-                        if( enc & (1 << j) ){
+                        if( enc & (1ull << j) ){
                             v[j] += vote;
                         }
                     }
@@ -788,6 +842,7 @@ void dump_batches( struct job *job ){
                     fprintf( fp, "\n" );
                 }
                 fclose( fp );
+#endif
             }
 
             // Raw dump

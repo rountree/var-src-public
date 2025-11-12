@@ -11,7 +11,7 @@
 ./var -m 0 \
     --benchmark=ABXOR:9-14:1:0:0 \
     --poll=0x611:OP_POLL+OP_TSC+DELTA_TSC+OP_THERM+OP_PTHERM+DELTA_THERM+DELTA_PTHERM:500us:2:8 \
-    --time=2h \
+    --time=10m \
     --abTime=100ms
 
 
