@@ -13,10 +13,10 @@ ifneq ($(filter $(shell hostname), comus octomore rhetoric iris lupine gilia sor
 else ifneq ($(filter $(shell hostname | sed -e "s/[0-9]//g"), rzhound rzwhippet),)
 	CFLAGS=-iquote /usr/workspace/msr-adm/rzhound_dat/msr-safe -std=c2x
 	CC=gcc
-# cz machines
+# cz machines.  gcc is on poodle, msr-safe is on dane, fix it later....
 else ifneq ($(filter $(shell hostname | sed -e "s/[0-9]//g"), dane poodle),)
-	CFLAGS=-iquote /p/vast1/rountree/poodle/repos/msr-safe -std=c23
-	CC=/p/vast1/rountree/poodle/install/gcc-trunk-27Oct2024/bin/gcc
+	CFLAGS=-iquote /p/vast1/rountree/repos/msr-safe -std=c23
+	CC=/p/vast1/rountree/machines/poodle/install/gcc-trunk-27Oct2024/bin/gcc
 # offsite machines
 else ifneq ($(filter $(shell hostname), serif catharsis),)
 	CFLAGS=-iquote ${HOME}/repos/msr-safe -std=c23
